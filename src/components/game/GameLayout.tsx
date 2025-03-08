@@ -7,6 +7,8 @@ import { useGame } from "@/lib/game-context";
 import { useTheme } from "next-themes";
 import GameScene from "./GameScene";
 import DetectiveNotebook from "./DetectiveNotebook";
+import TutorialOverlay from "./TutorialOverlay";
+import HelpMenu from "./HelpMenu";
 
 export default function GameLayout() {
   const { gameState, startGame, resetGame } = useGame();
@@ -17,11 +19,19 @@ export default function GameLayout() {
   const [showInstructions, setShowInstructions] = useState(false);
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Set theme handling with next-themes
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Check if tutorial was completed before
+  useEffect(() => {
+    if (gameStarted && !localStorage.getItem("tutorialCompleted")) {
+      setShowTutorial(true);
+    }
+  }, [gameStarted]);
 
   // Handle starting a new game
   const handleStartGame = () => {
@@ -67,6 +77,16 @@ export default function GameLayout() {
       </div>
     </div>
   );
+
+  // Handle tutorial completion
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+  };
+  
+  // Add a function to manually show the tutorial
+  const handleShowTutorial = () => {
+    setShowTutorial(true);
+  };
 
   // Don't render with hydration mismatch
   if (!mounted) return null;
@@ -188,6 +208,8 @@ export default function GameLayout() {
         </div>
         
         <div className="flex items-center gap-2">
+          <HelpMenu onStartTutorial={handleShowTutorial} />
+          
           <Button 
             variant="ghost" 
             size="sm" 
@@ -240,6 +262,7 @@ export default function GameLayout() {
           variant="outline"
           className="rounded-full w-14 h-14 flex items-center justify-center shadow-lg border-2"
           title={showNotebook ? "Close Notebook" : "Open Detective's Notebook"}
+          id="notebook-toggle"
         >
           {showNotebook ? '📕' : '📖'}
         </Button>
@@ -254,6 +277,8 @@ export default function GameLayout() {
           {renderInstructions()}
         </DialogContent>
       </Dialog>
+      
+      {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
     </div>
   );
 } 

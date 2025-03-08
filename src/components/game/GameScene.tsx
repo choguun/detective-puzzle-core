@@ -115,7 +115,7 @@ export default function GameScene() {
           </div>
           
           {/* Scene navigation buttons */}
-          <div className="absolute bottom-4 right-4 flex space-x-2">
+          <div className="absolute bottom-4 right-4 flex space-x-2" id="scene-navigation">
             {allScenes
               .filter(scene => scene.id !== currentScene.id)
               .map(scene => (
@@ -175,7 +175,7 @@ export default function GameScene() {
       </div>
 
       {/* Scene Description */}
-      <Card className="p-6 detective-paper relative">
+      <Card className="p-6 detective-paper relative" id="scene-description">
         {showHints && gameplayState.hints.length > 0 && (
           <div className="absolute -top-4 right-6 bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-lg shadow-md border border-yellow-200 dark:border-yellow-800 max-w-xs z-10">
             <h4 className="text-sm font-bold mb-1">Detective&apos;s Insights:</h4>
@@ -211,7 +211,7 @@ export default function GameScene() {
       </Card>
 
       {/* Available Clues */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="clues-container">
         {visibleClues.map((clue) => (
           <ClueItem 
             key={clue.id} 
