@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "./MysteryToken.sol";
 import "./DetectiveGameLeaderboard.sol";
+import "./ClueNFT.sol";
 
 /**
  * @title GameLogic
@@ -14,6 +15,7 @@ contract GameLogic is Ownable, Pausable {
     // References to other contracts
     MysteryToken public mysteryToken;
     DetectiveGameLeaderboard public leaderboard;
+    ClueNFT public clueNFT;
     
     // Game scene data
     struct Scene {
@@ -38,6 +40,9 @@ contract GameLogic is Ownable, Pausable {
     // Track overall game completion per player
     mapping(address => bool) public gameCompleted;
     
+    // Track which clues a player has found
+    mapping(address => mapping(uint256 => bool)) public foundClues;
+    
     // Authorized game administrators who can call certain functions
     mapping(address => bool) public gameAdmins;
     
@@ -48,6 +53,7 @@ contract GameLogic is Ownable, Pausable {
     event GameCompleted(address indexed player, uint256 totalReward);
     event AdminAdded(address indexed admin);
     event AdminRemoved(address indexed admin);
+    event ClueFound(address indexed player, uint256 indexed clueId, string sceneId);
     
     // Modifiers
     modifier onlyAdmin() {
@@ -59,18 +65,22 @@ contract GameLogic is Ownable, Pausable {
      * @dev Constructor to set up the contract
      * @param tokenAddress Address of the MysteryToken contract
      * @param leaderboardAddress Address of the DetectiveGameLeaderboard contract
+     * @param clueNFTAddress Address of the ClueNFT contract
      * @param initialOwner The address that will own the contract
      */
     constructor(
         address tokenAddress,
         address leaderboardAddress,
+        address clueNFTAddress,
         address initialOwner
     ) Ownable(initialOwner) {
         require(tokenAddress != address(0), "GameLogic: token is the zero address");
         require(leaderboardAddress != address(0), "GameLogic: leaderboard is the zero address");
+        require(clueNFTAddress != address(0), "GameLogic: clueNFT is the zero address");
         
         mysteryToken = MysteryToken(tokenAddress);
         leaderboard = DetectiveGameLeaderboard(leaderboardAddress);
+        clueNFT = ClueNFT(clueNFTAddress);
         
         // Add the contract owner as a game admin
         gameAdmins[initialOwner] = true;
@@ -168,6 +178,56 @@ contract GameLogic is Ownable, Pausable {
         
         // Check if the player has completed all active scenes
         checkGameCompletion(player);
+    }
+    
+    /**
+     * @dev Record that a player has found a clue and mint the corresponding NFT
+     * @param player Address of the player who found the clue
+     * @param clueId ID of the clue that was found
+     */
+    function findClue(address player, uint256 clueId) external onlyAdmin whenNotPaused {
+        require(player != address(0), "GameLogic: player is the zero address");
+        require(!foundClues[player][clueId], "GameLogic: clue already found by player");
+        
+        // Get the clue metadata to verify it exists and get the scene ID
+        (, string memory sceneId, , ) = clueNFT.getClueMetadata(clueId);
+        
+        // Mark the clue as found by the player
+        foundClues[player][clueId] = true;
+        
+        // Mint the clue NFT to the player
+        clueNFT.mintClue(player, clueId);
+        
+        emit ClueFound(player, clueId, sceneId);
+    }
+    
+    /**
+     * @dev Check if a player has found a specific clue
+     * @param player The player's address
+     * @param clueId The clue ID to check
+     * @return Whether the player has found the clue
+     */
+    function hasFoundClue(address player, uint256 clueId) external view returns (bool) {
+        return foundClues[player][clueId];
+    }
+    
+    /**
+     * @dev Get the number of clues a player has found in a specific scene
+     * @param player The player's address
+     * @param sceneId The scene ID to check
+     * @return The number of clues found by the player in the scene
+     */
+    function getCluesFoundInScene(address player, string calldata sceneId) external view returns (uint256) {
+        uint256[] memory sceneClues = clueNFT.getSceneClues(sceneId);
+        uint256 count = 0;
+        
+        for (uint256 i = 0; i < sceneClues.length; i++) {
+            if (foundClues[player][sceneClues[i]]) {
+                count++;
+            }
+        }
+        
+        return count;
     }
     
     /**

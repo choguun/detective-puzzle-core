@@ -62,6 +62,7 @@ An interactive narrative detective puzzle game powered by AI. Explore mysterious
 
 - **Scene Exploration**: Navigate through different scenes with immersive visuals and descriptions
 - **Clue Discovery**: Find and examine clues to uncover the truth with intuitive UI interactions
+- **On-Chain Clue Ownership**: Each discovered clue is minted as an NFT to the player's wallet
 - **Note Taking**: Record your thoughts and theories in the detective's notebook
 - **Evidence Board**: Visualize connections between discovered clues
 - **Case Analysis**: Request AI-generated analysis of your discovered clues
@@ -105,14 +106,17 @@ This project includes a set of Ethereum smart contracts built with Foundry for m
 - **DetectiveGameLeaderboard**: Tracks player progress, scores, and game completion status
 - **MysteryToken**: ERC20 token awarded to players for completing scenes and the full game
 - **GameLogic**: Manages game progression, scene completion, and token rewards
+- **ClueNFT**: ERC1155 token representing clues that players discover during gameplay
 
 ### Contract Features
 
 - **Token Rewards**: Players earn MysteryTokens for completing scenes
+- **Clue NFTs**: Players receive unique NFTs for each clue they discover
 - **Leaderboard**: Global leaderboard tracking top scores and completion times
 - **Scene Management**: Game admins can add, update, and manage game scenes
 - **Completion Bonuses**: Special rewards for completing the entire game
 - **Score Calculation**: Scores calculated based on completion time and clues found
+- **On-Chain Verification**: All player progress and discoveries are recorded on-chain
 
 ### Contract Development
 
@@ -145,5 +149,6 @@ The smart contracts are built using Foundry, a fast and flexible development fra
 ## Contract Architecture
 
 - **MysteryToken**: ERC20 token with minting capabilities restricted to the GameLogic contract
-- **GameLogic**: Central contract managing game progression, scene completion, and token rewards
+- **ClueNFT**: ERC1155 token representing clues that players discover, with metadata for each clue
+- **GameLogic**: Central contract managing game progression, scene completion, clue discovery, and token rewards
 - **DetectiveGameLeaderboard**: Stores player scores and game completion status

@@ -5,16 +5,22 @@ import "forge-std/Test.sol";
 import "../src/GameLogic.sol";
 import "../src/MysteryToken.sol";
 import "../src/DetectiveGameLeaderboard.sol";
+import "../src/ClueNFT.sol";
 
 contract GameLogicTest is Test {
     GameLogic gameLogic;
     MysteryToken token;
     DetectiveGameLeaderboard leaderboard;
+    ClueNFT clueNFT;
     
     address owner = address(1);
     address admin = address(2);
     address player1 = address(3);
     address player2 = address(4);
+    
+    string baseURI = "https://detective-game.example.com/api/clue/";
+    uint256 clueId1;
+    uint256 clueId2;
 
     function setUp() public {
         vm.startPrank(owner);
@@ -25,10 +31,14 @@ contract GameLogicTest is Test {
         // Deploy leaderboard
         leaderboard = new DetectiveGameLeaderboard();
         
+        // Deploy ClueNFT
+        clueNFT = new ClueNFT(owner, baseURI);
+        
         // Deploy game logic
         gameLogic = new GameLogic(
             address(token),
             address(leaderboard),
+            address(clueNFT),
             owner
         );
         
@@ -38,8 +48,31 @@ contract GameLogicTest is Test {
         // Set game logic as authorized for leaderboard
         leaderboard.setGameLogicContract(address(gameLogic));
         
+        // Set game logic as authorized for ClueNFT
+        clueNFT.setGameLogicContract(address(gameLogic));
+        
         // Add admin
         gameLogic.addAdmin(admin);
+        
+        // Add a scene
+        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
+        
+        // Add clues to the scene
+        clueId1 = clueNFT.addClue(
+            "study", 
+            "Mysterious Letter", 
+            "A letter with cryptic handwriting", 
+            2, 
+            "ipfs://QmExample1"
+        );
+        
+        clueId2 = clueNFT.addClue(
+            "study", 
+            "Broken Watch", 
+            "A pocket watch stopped at exactly 3:15", 
+            3, 
+            "ipfs://QmExample2"
+        );
         
         vm.stopPrank();
     }
@@ -47,13 +80,13 @@ contract GameLogicTest is Test {
     function testAddScene() public {
         // Add a scene as owner
         vm.prank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
+        gameLogic.addScene("library", "Old Library", 15 * 10**18);
         
         // Verify scene was added
-        (string memory id, string memory name, uint256 rewardAmount, bool active) = gameLogic.scenes("study");
-        assertEq(id, "study");
-        assertEq(name, "Detective's Study");
-        assertEq(rewardAmount, 10 * 10**18);
+        (string memory id, string memory name, uint256 rewardAmount, bool active) = gameLogic.scenes("library");
+        assertEq(id, "library");
+        assertEq(name, "Old Library");
+        assertEq(rewardAmount, 15 * 10**18);
         assertTrue(active);
     }
 
@@ -74,14 +107,10 @@ contract GameLogicTest is Test {
         // Try to add a scene as non-admin
         vm.prank(player1);
         vm.expectRevert("GameLogic: caller is not an admin or owner");
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
+        gameLogic.addScene("library", "Old Library", 15 * 10**18);
     }
 
     function testUpdateScene() public {
-        // Add a scene
-        vm.prank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
-        
         // Update the scene
         vm.prank(owner);
         gameLogic.updateScene("study", "Updated Study Name", 20 * 10**18, false);
@@ -95,10 +124,6 @@ contract GameLogicTest is Test {
     }
 
     function testCompleteScene() public {
-        // Add a scene
-        vm.prank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
-        
         // Complete the scene as admin
         vm.prank(admin);
         gameLogic.completeScene(player1, "study", 250, 5);
@@ -119,10 +144,6 @@ contract GameLogicTest is Test {
     }
 
     function testCannotCompleteSceneTwice() public {
-        // Add a scene
-        vm.prank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
-        
         // Complete the scene
         vm.prank(admin);
         gameLogic.completeScene(player1, "study", 250, 5);
@@ -134,9 +155,8 @@ contract GameLogicTest is Test {
     }
 
     function testCompleteGame() public {
-        // Add all game scenes
+        // Add more scenes
         vm.startPrank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
         gameLogic.addScene("library", "Old Library", 15 * 10**18);
         gameLogic.addScene("basement", "Hidden Basement", 25 * 10**18);
         vm.stopPrank();
@@ -175,10 +195,6 @@ contract GameLogicTest is Test {
     }
 
     function testPause() public {
-        // Add a scene
-        vm.prank(owner);
-        gameLogic.addScene("study", "Detective's Study", 10 * 10**18);
-        
         // Pause the contract
         vm.prank(owner);
         gameLogic.pause();
@@ -225,5 +241,47 @@ contract GameLogicTest is Test {
         vm.prank(player1);
         vm.expectRevert();
         gameLogic.removeAdmin(admin);
+    }
+    
+    function testFindClue() public {
+        // Find a clue as admin
+        vm.prank(admin);
+        gameLogic.findClue(player1, clueId1);
+        
+        // Check player found the clue
+        assertTrue(gameLogic.hasFoundClue(player1, clueId1));
+        
+        // Check player received the clue NFT
+        assertEq(clueNFT.balanceOf(player1, clueId1), 1);
+        assertTrue(clueNFT.hasClue(player1, clueId1));
+    }
+    
+    function testCannotFindClueAgain() public {
+        // Find a clue
+        vm.prank(admin);
+        gameLogic.findClue(player1, clueId1);
+        
+        // Try to find the same clue again
+        vm.prank(admin);
+        vm.expectRevert("GameLogic: clue already found by player");
+        gameLogic.findClue(player1, clueId1);
+    }
+    
+    function testGetCluesFoundInScene() public {
+        // Find multiple clues
+        vm.startPrank(admin);
+        gameLogic.findClue(player1, clueId1);
+        gameLogic.findClue(player1, clueId2);
+        vm.stopPrank();
+        
+        // Check clues found in scene
+        assertEq(gameLogic.getCluesFoundInScene(player1, "study"), 2);
+    }
+    
+    function testNonAdminCannotFindClue() public {
+        // Try to find a clue as non-admin
+        vm.prank(player1);
+        vm.expectRevert("GameLogic: caller is not an admin or owner");
+        gameLogic.findClue(player1, clueId1);
     }
 } 
