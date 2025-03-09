@@ -5,9 +5,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { useGame } from "@/lib/game-context";
-import useGameplay from "@/lib/use-gameplay";
 import { Clue } from "@/lib/game-context";
-import NarrativeDisplay from "./NarrativeDisplay";
 
 interface ClueItemProps {
   clue: Clue;
@@ -15,15 +13,7 @@ interface ClueItemProps {
 }
 
 export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
-  const { gameState } = useGame();
-  const { allClues } = gameState;
-  
-  const { 
-    narrativeContent, 
-    isGeneratingNarrative, 
-    handleExamineClue,
-    gameplayState 
-  } = useGameplay();
+  const { clues } = useGame();
   
   const [isHovered, setIsHovered] = useState(false);
   const [showPulse, setShowPulse] = useState(!clue.discovered);
@@ -31,7 +21,6 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const dialogRef = useRef<HTMLButtonElement>(null);
-  const isActiveClue = gameplayState.activeClueId === clue.id;
 
   // Pulse effect for undiscovered clues
   useEffect(() => {
@@ -58,22 +47,14 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
       onDiscover();
     }
 
-    // Examine the clue via our gameplay hook
-    handleExamineClue(clue.id);
-
-    // If your logic needs a local update to "examined", do it here:
-    // E.g., if your context doesn't provide it automatically:
-    // clue.examined = true;
-
     setShowDialogContent(true);
     setIsDialogOpen(true);
   };
 
-  // Enhanced button text
-  const getButtonText = () => {
-    if (!clue.discovered) return "Investigate Object";
-    if (!clue.examined) return "Examine Closely";
-    return "Review Evidence";
+  // Get index of this clue in the discovered clues
+  const getClueIndex = () => {
+    const discoveredClues = clues.filter(c => c.discovered);
+    return discoveredClues.findIndex(c => c.id === clue.id) + 1;
   };
 
   return (
@@ -81,7 +62,6 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
       className={`
         ${clue.discovered ? "opacity-100" : "opacity-85 hover:opacity-100"}
         ${showPulse && !clue.discovered ? "clue-highlight" : ""}
-        ${isActiveClue ? "ring-2 ring-primary" : ""}
         transition-all duration-300 relative overflow-hidden
       `}
       onMouseEnter={() => setIsHovered(true)}
@@ -95,20 +75,12 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
         </div>
       )}
       
-      {clue.discovered && !clue.examined && (
-        <div className="absolute top-0 right-0 w-5 h-5 bg-yellow-400 rounded-full m-2 animate-pulse" />
-      )}
-      
-      {clue.examined && (
-        <div className="absolute top-0 right-0 w-5 h-5 bg-green-500 rounded-full m-2" />
-      )}
-      
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex items-center">
           {clue.discovered ? clue.name : "Unknown Object"}
-          {clue.examined && (
+          {clue.discovered && (
             <span className="ml-auto text-xs bg-primary/10 px-2 py-1 rounded-full">
-              Examined
+              Evidence #{getClueIndex()}
             </span>
           )}
         </CardTitle>
@@ -126,16 +98,15 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild ref={dialogRef}>
             <Button 
-              variant={clue.examined ? "outline" : "default"}
+              variant="default"
               onClick={handleExamineClueClick}
               className={`
                 w-full
                 ${!clue.discovered ? "magnifying-cursor" : ""}
-                ${clue.examined ? "border-primary/50" : ""}
               `}
             >
               {!clue.discovered && <span className="mr-2">🔍</span>}
-              {getButtonText()}
+              {clue.discovered ? "View Details" : "Investigate Object"}
             </Button>
           </DialogTrigger>
           
@@ -144,27 +115,23 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
               <DialogHeader className="border-b pb-2">
                 <DialogTitle className="flex items-center">
                   <span>{clue.name}</span>
-                  {clue.examined && (
-                    <span className="ml-auto text-xs bg-primary/10 px-2 py-1 rounded-full">
-                      Evidence #{allClues.filter(c => c.examined).findIndex(c => c.id === clue.id) + 1}
-                    </span>
-                  )}
+                  <span className="ml-auto text-xs bg-primary/10 px-2 py-1 rounded-full">
+                    Evidence #{getClueIndex()}
+                  </span>
                 </DialogTitle>
               </DialogHeader>
               
               <div className="mt-4 space-y-4">
                 <div className="p-2 border rounded-md bg-secondary/30">
-                  <h4 className="text-sm font-medium mb-1">Basic Description:</h4>
+                  <h4 className="text-sm font-medium mb-1">Description:</h4>
                   <p className="text-sm text-muted-foreground">{clue.description}</p>
                 </div>
                 
                 <div className="border-t pt-4">
-                  <h4 className="text-sm font-medium mb-2">Detective&apos;s Analysis:</h4>
-                  <NarrativeDisplay 
-                    content={isActiveClue ? narrativeContent : clue.content || "Examining this clue closely..."}
-                    isLoading={isGeneratingNarrative && isActiveClue}
-                    highlightTerms={["important", "connection", "hint", "clue", "sign", "suspicious"]}
-                  />
+                  <h4 className="text-sm font-medium mb-2">Detective&apos;s Notes:</h4>
+                  <p className="text-sm">
+                    This evidence was found in the {clue.sceneId}. It could be connected to the case.
+                  </p>
                 </div>
                 
                 <div className="flex justify-end pt-2">

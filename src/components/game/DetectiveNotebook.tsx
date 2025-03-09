@@ -87,7 +87,7 @@ export default function DetectiveNotebook() {
               </h3>
               <Textarea
                 placeholder="Take notes about the case here... What connections do you see between the clues? What theories are you developing?"
-                className="min-h-[200px] notebook-paper p-4 leading-relaxed"
+                className="min-h-[200px] notebook-paper p-4 leading-relaxed text-black"
                 value={noteText}
                 onChange={handleNoteChange}
               />

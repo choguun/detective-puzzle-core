@@ -25,6 +25,7 @@ export default function GameScene() {
     sceneImageUrl,
     currentNarrative,
     regenerateNarrative,
+    isGeneratingNarrative,
     totalSeconds,
     isTimerRunning,
     isGameStarted,
@@ -44,6 +45,9 @@ export default function GameScene() {
 
   // State for mouse position
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
+
+  // State to control clues container visibility
+  const [showCluesContainer, setShowCluesContainer] = useState<boolean>(true);
 
   // Image generation state
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
@@ -259,6 +263,18 @@ export default function GameScene() {
     setShowHints(prev => !prev);
   };
 
+  // Toggle clues visibility for 5 seconds
+  const showCluesTemporarily = () => {
+    setShowCluesContainer(true);
+    showActionFeedback("Clues visible for 5 seconds!", "info");
+    
+    // Hide again after 5 seconds
+    setTimeout(() => {
+      setShowCluesContainer(false);
+      showActionFeedback("Clues hidden again.", "info");
+    }, 5000);
+  };
+
   // Generate narrative/scene description
   const handleGenerateSceneImage = async (customPrompt?: string) => {
     try {
@@ -355,6 +371,28 @@ export default function GameScene() {
     }
   }, [isGameStarted, startGame]);
 
+  // Set a timer to hide clues container after 10 seconds
+  useEffect(() => {
+    // Reset visibility when scene changes
+    setShowCluesContainer(true);
+    
+    // Set a timer to hide clues after 10 seconds
+    const timer = setTimeout(() => {
+      setShowCluesContainer(false);
+    }, 10000); // 10 seconds
+    
+    // Show message when hiding
+    const messageTimer = setTimeout(() => {
+      showActionFeedback("Clues are now hidden! Use detective actions to find them.", "info");
+    }, 9800); // Just before hiding
+    
+    // Cleanup function
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(messageTimer);
+    };
+  }, [currentScene, showActionFeedback]);
+
   // Set background image when scene changes
   useEffect(() => {
     if (!currentScene) return;
@@ -425,7 +463,7 @@ export default function GameScene() {
           {/* Clues Container (now hidden from direct clicking, only via actions) */}
           <div 
             id="clues-container"
-            className="absolute inset-0 z-20 pointer-events-none" 
+            className={`absolute inset-0 z-20 pointer-events-none ${showCluesContainer ? 'opacity-100' : 'opacity-0'} transition-opacity duration-1000`}
           >
             {/* Discovered clues will be visualized here as they're found through actions */}
             {discoveredClues.filter(clue => clue.sceneId === currentScene.id).map(clue => (
@@ -551,11 +589,32 @@ export default function GameScene() {
             {currentNarrative ? (
               <div>
                 {currentNarrative.split('\n').map((paragraph, i) => (
-                  paragraph.trim() ? <p key={i}>{paragraph}</p> : null
+                  paragraph.trim() ? (
+                    <p key={i}>
+                      {paragraph}
+                      {i === currentNarrative.split('\n').filter(p => p.trim()).length - 1 && 
+                       isGeneratingNarrative && (
+                        <span className="loading-dots ml-1">
+                          <span className="dot">.</span>
+                          <span className="dot">.</span>
+                          <span className="dot">.</span>
+                        </span>
+                      )}
+                    </p>
+                  ) : null
                 ))}
               </div>
             ) : (
-              <p>{currentScene.description}</p>
+              <p>
+                {currentScene.description}
+                {isGeneratingNarrative && (
+                  <span className="loading-dots ml-1">
+                    <span className="dot">.</span>
+                    <span className="dot">.</span>
+                    <span className="dot">.</span>
+                  </span>
+                )}
+              </p>
             )}
           </div>
           <div className="flex space-x-2 mt-2">
@@ -574,6 +633,14 @@ export default function GameScene() {
               className="text-xs"
             >
               Generate Scene Image
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={showCluesTemporarily}
+              className="text-xs"
+            >
+              Show Clues
             </Button>
             {revisedPrompt && (
               <Button 
