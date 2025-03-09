@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -12,6 +11,7 @@ import ClueItem from "./ClueItem";
 import Spinner from "../ui/spinner";
 import GameTimer from "./GameTimer";
 import SceneSelector from "./SceneSelector";
+import MiniPuzzle from "./MiniPuzzle";
 
 export default function GameScene() {
   // Game context
@@ -29,11 +29,9 @@ export default function GameScene() {
     totalSeconds,
     isTimerRunning,
     isGameStarted,
-    startGame
+    startGame,
+    setCurrentSceneId
   } = useGameplay();
-
-  // Router
-  const router = useRouter();
 
   // Refs
   const sceneRef = useRef<HTMLDivElement>(null);
@@ -43,11 +41,17 @@ export default function GameScene() {
   const [playerAction, setPlayerAction] = useState<string>("");
   const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
 
+  // Debug mode state
+  const [debugMode, setDebugMode] = useState<boolean>(true);
+
   // State for mouse position
   const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
 
   // State to control clues container visibility
   const [showCluesContainer, setShowCluesContainer] = useState<boolean>(true);
+  
+  // State for scene transition animation
+  const [sceneTransition, setSceneTransition] = useState<boolean>(false);
 
   // Image generation state
   const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
@@ -64,6 +68,7 @@ export default function GameScene() {
   // Scene completion tracking
   const [completedScenes, setCompletedScenes] = useState<Record<string, boolean>>({});
   const [showSceneCompletionDialog, setShowSceneCompletionDialog] = useState<boolean>(false);
+  const [showScenePuzzle, setShowScenePuzzle] = useState<boolean>(false);
   
   // Feedback state
   const [actionFeedback, setActionFeedback] = useState<{message: string, type: string} | null>(null);
@@ -94,22 +99,16 @@ export default function GameScene() {
     );
     
     if (allDiscovered && sceneClues.length > 0) {
-      // Mark scene as completed
-      setCompletedScenes(prev => ({
-        ...prev,
-        [currentScene.id]: true
-      }));
-      
-      // Show completion dialog
-      setShowSceneCompletionDialog(true);
-      
       // Show success message
       showActionFeedback(
-        `You've discovered all clues in the ${currentScene.name}!`, 
+        `You've discovered all clues in the ${currentScene.name}! Now solve the puzzle to proceed.`, 
         "success"
       );
+      
+      // Show the puzzle instead of marking complete immediately
+      setShowScenePuzzle(true);
     }
-  }, [currentScene, completedScenes, discoveredClueIds, showActionFeedback]);
+  }, [currentScene, completedScenes, discoveredClueIds, showActionFeedback, setShowScenePuzzle]);
 
   // Check completion when discovered clues change
   useEffect(() => {
@@ -141,28 +140,51 @@ export default function GameScene() {
 
   // Handle image loading error
   const handleImageError = () => {
-    // If the image fails to load, try loading a default image
-    setBackgroundImageUrl("/images/detective-background.jpg");
+    // Generate a CSS-based background based on the current scene
+    if (!currentScene) return;
+    
+    console.log(`Image failed to load for scene: ${currentScene.id}, using CSS background`);
+    
+    // Set to null to trigger CSS background fallback
+    setBackgroundImageUrl(null);
+    
+    // Add a CSS class to the scene container based on the current scene
+    if (sceneRef.current) {
+      // Remove any existing scene-specific classes
+      sceneRef.current.classList.remove("study-scene", "library-scene", "basement-scene");
+      
+      // Add the appropriate class for the current scene
+      sceneRef.current.classList.add(`${currentScene.id}-scene`);
+    }
   };
 
   // Handle scene change
   const handleSceneChange = (sceneId: string) => {
     if (!sceneId || !availableScenes) return;
     
-    // If we have navigation confirmation for important scenes, add it here
+    // Start transition animation
+    setSceneTransition(true);
     
     console.log(`Changing scene to: ${sceneId}`);
     
     // Reset the scene-specific state
     setActionResponse(null);
     setMousePosition(null);
-    setBackgroundImageUrl(null);
     
-    // Change the scene in the game context
-    router.push(`/game/${sceneId}`);
-    
-    // Force reload scene description
-    regenerateNarrative();
+    // Wait for transition animation before changing scene
+    setTimeout(() => {
+      // Change the scene in the game context directly instead of using router
+      // This ensures we stay on the same page and just update the current scene
+      setCurrentSceneId(sceneId);
+      
+      // Show feedback to the user
+      showActionFeedback(`Moving to ${availableScenes.find(s => s.id === sceneId)?.name || 'new location'}...`, "info");
+      
+      // End transition after a brief delay to allow new scene to load
+      setTimeout(() => {
+        setSceneTransition(false);
+      }, 500);
+    }, 300);
   };
 
   // Handle clue discovery through player actions
@@ -255,6 +277,65 @@ export default function GameScene() {
     }
   };
 
+  // Handle puzzle completion
+  const handlePuzzleComplete = () => {
+    if (!currentScene) return;
+    
+    // Mark scene as completed
+    setCompletedScenes(prev => ({
+      ...prev,
+      [currentScene.id]: true
+    }));
+    
+    // Close the puzzle
+    setShowScenePuzzle(false);
+    
+    // Show completion dialog
+    setShowSceneCompletionDialog(true);
+    
+    // Show success message
+    showActionFeedback("Puzzle solved! You've unlocked the next scene.", "success");
+  };
+
+  // Debug functions
+  const toggleDebugMode = () => {
+    setDebugMode(prev => !prev);
+    showActionFeedback(
+      debugMode ? "Debug mode deactivated" : "Debug mode activated", 
+      "info"
+    );
+  };
+  
+  const revealAllCluesInScene = () => {
+    if (!currentScene) return;
+    
+    // Get all undiscovered clues in this scene
+    const sceneClueIds = currentScene.clueIds || [];
+    const undiscoveredClues = sceneClueIds.filter(id => !discoveredClueIds.includes(id));
+    
+    // Discover each clue with a small delay for visual effect
+    undiscoveredClues.forEach((clueId, index) => {
+      setTimeout(() => {
+        handleClueDiscovery(clueId);
+      }, index * 300);
+    });
+    
+    showActionFeedback(`Revealing ${undiscoveredClues.length} clues in debug mode`, "info");
+  };
+  
+  const testPuzzleForScene = () => {
+    if (!currentScene) return;
+    
+    // First make sure all clues are discovered
+    revealAllCluesInScene();
+    
+    // Open the puzzle after a short delay to ensure clues are discovered
+    setTimeout(() => {
+      setShowScenePuzzle(true);
+      showActionFeedback("Opening puzzle in debug mode", "info");
+    }, 1000);
+  };
+
   // UI for displaying hints
   const [showHints, setShowHints] = useState<boolean>(false);
   
@@ -322,7 +403,12 @@ export default function GameScene() {
 
   // Regenerate the narrative description
   const handleRegenerateNarrative = () => {
-    regenerateNarrative();
+    // Force regeneration when user explicitly requests it
+    console.log("User requested narrative refresh - forcing regeneration");
+    regenerateNarrative(true);
+    
+    // Show feedback to the user
+    showActionFeedback("Refreshing scene description...", "info");
   };
 
   // Get scene-specific prompt examples
@@ -397,14 +483,30 @@ export default function GameScene() {
   useEffect(() => {
     if (!currentScene) return;
     
+    // First apply the scene-specific CSS class for fallback
+    if (sceneRef.current) {
+      sceneRef.current.classList.remove("study-scene", "library-scene", "basement-scene");
+      sceneRef.current.classList.add(`${currentScene.id}-scene`);
+    }
+    
+    // When transitioning, clear the image temporarily
+    if (sceneTransition) {
+      setBackgroundImageUrl(null);
+      return;
+    }
+    
+    // Set the image from the scene data - will fall back to CSS if load fails
     if (currentScene.backgroundImage) {
+      console.log(`Loading background image: ${currentScene.backgroundImage}`);
       setBackgroundImageUrl(currentScene.backgroundImage);
     } else if (currentScene.imageUrl) {
+      console.log(`Loading image URL: ${currentScene.imageUrl}`);
       setBackgroundImageUrl(currentScene.imageUrl);
     } else {
-      setBackgroundImageUrl("/images/detective-background.jpg");
+      // No image specified, use CSS background
+      setBackgroundImageUrl(null);
     }
-  }, [currentScene]);
+  }, [currentScene, sceneTransition]);
 
   // Focus action input on mount
   useEffect(() => {
@@ -431,7 +533,9 @@ export default function GameScene() {
       <div className="md:col-span-2 relative overflow-hidden rounded-lg">
         <div 
           ref={sceneRef}
-          className="relative w-full h-[60vh] md:h-[70vh] bg-black/50 overflow-hidden rounded-lg"
+          className={`relative w-full h-[60vh] md:h-[70vh] bg-black/50 overflow-hidden rounded-lg transition-opacity duration-500 ${
+            sceneTransition ? 'opacity-0' : 'opacity-100'
+          } ${currentScene ? `${currentScene.id}-scene` : ''}`}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
@@ -617,7 +721,7 @@ export default function GameScene() {
               </p>
             )}
           </div>
-          <div className="flex space-x-2 mt-2">
+          {/* <div className="flex space-x-2 mt-2">
             <Button 
               variant="outline" 
               size="sm" 
@@ -652,7 +756,7 @@ export default function GameScene() {
                 {showRevisedPrompt ? "Hide Prompt" : "Show Prompt"}
               </Button>
             )}
-          </div>
+          </div> */}
           {showRevisedPrompt && revisedPrompt && (
             <div className="mt-2 p-2 bg-gray-700 rounded text-xs">
               <p>Revised prompt: {revisedPrompt}</p>
@@ -767,6 +871,52 @@ export default function GameScene() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Mini Puzzle */}
+      <MiniPuzzle
+        open={showScenePuzzle}
+        onClose={() => setShowScenePuzzle(false)}
+        onComplete={handlePuzzleComplete}
+        sceneId={currentScene.id}
+        clues={discoveredClues.filter(clue => clue.sceneId === currentScene.id)}
+      />
+      
+      {/* Debug Panel - only visible in debug mode */}
+      <div className={`fixed bottom-4 left-4 bg-black/80 p-2 rounded-lg z-50 transition-all duration-300 ${
+        debugMode ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'
+      }`}>
+        <div className="text-xs text-red-400 uppercase font-bold mb-2">Debug Mode</div>
+        <div className="space-y-2">
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            className="w-full"
+            onClick={revealAllCluesInScene}
+          >
+            Reveal All Clues
+          </Button>
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            className="w-full"
+            onClick={testPuzzleForScene}
+          >
+            Test Puzzle
+          </Button>
+        </div>
+      </div>
+      
+      {/* Debug Mode Toggle - always visible */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          className={`opacity-30 hover:opacity-100 ${debugMode ? 'border-red-500 text-red-500' : ''}`}
+          onClick={toggleDebugMode}
+        >
+          {debugMode ? 'Exit Debug' : 'Debug'}
+        </Button>
+      </div>
     </div>
   );
 } 

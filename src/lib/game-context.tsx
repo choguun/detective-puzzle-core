@@ -34,6 +34,8 @@ export const DEFAULT_SCENES: GameScene[] = [
     id: "study",
     name: "Professor's Study",
     description: "The dimly lit study contains a large oak desk covered with papers, a wall of bookshelves, and several curious artifacts. A painting hangs slightly askew on the wall.",
+    imageUrl: "/images/detective-background.jpg",
+    backgroundImage: "/images/detective-background.jpg",
     clueIds: ["drawer", "painting", "letters", "bookshelf", "paperweight"],
     completed: false
   },
@@ -41,6 +43,8 @@ export const DEFAULT_SCENES: GameScene[] = [
     id: "library",
     name: "University Library",
     description: "Tall bookshelves line the walls of this vast library. Dust particles dance in the beams of light from the stained glass windows. A librarian's desk stands empty.",
+    imageUrl: "/images/detective-background.jpg",
+    backgroundImage: "/images/detective-background.jpg",
     clueIds: ["book", "desk", "window", "catalog", "floorboard"],
     completed: false
   },
@@ -48,6 +52,8 @@ export const DEFAULT_SCENES: GameScene[] = [
     id: "basement",
     name: "Hidden Basement",
     description: "A damp, musty basement hidden beneath the university. Strange symbols adorn the walls, and old scientific equipment fills the shelves. A single lightbulb provides minimal illumination.",
+    imageUrl: "/images/detective-background.jpg",
+    backgroundImage: "/images/detective-background.jpg",
     clueIds: ["symbols", "lockbox", "photograph", "equipment", "journal"],
     completed: false
   }

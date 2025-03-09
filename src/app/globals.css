@@ -360,3 +360,83 @@
     opacity: 0;
   }
 }
+
+/* Scene transition animation */
+.scene-transition-enter {
+  opacity: 0;
+  transform: scale(0.98);
+}
+
+.scene-transition-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 500ms, transform 500ms;
+}
+
+.scene-transition-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.scene-transition-exit-active {
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity 500ms, transform 500ms;
+}
+
+/* Scene-specific backgrounds */
+.study-scene {
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)),
+              radial-gradient(circle at center, #3a2a1d 0%, #1a0e05 100%);
+  position: relative;
+}
+
+.study-scene::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(90, 60, 30, 0.1) 20px, rgba(90, 60, 30, 0.1) 21px),
+    repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(90, 60, 30, 0.1) 20px, rgba(90, 60, 30, 0.1) 21px);
+  opacity: 0.3;
+}
+
+.library-scene {
+  background: linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.8)),
+              radial-gradient(circle at top, #2a3142 0%, #141c2e 100%);
+  position: relative;
+}
+
+.library-scene::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    repeating-linear-gradient(90deg, transparent, transparent 30px, rgba(60, 70, 100, 0.1) 30px, rgba(60, 70, 100, 0.1) 60px);
+  opacity: 0.2;
+}
+
+.basement-scene {
+  background: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.9)),
+              radial-gradient(circle at bottom, #1a1a22 0%, #0a0a12 100%);
+  position: relative;
+}
+
+.basement-scene::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 30% 40%, rgba(50, 30, 70, 0.2) 0%, transparent 80%),
+    radial-gradient(circle at 70% 60%, rgba(30, 50, 70, 0.2) 0%, transparent 80%);
+  opacity: 0.3;
+}
