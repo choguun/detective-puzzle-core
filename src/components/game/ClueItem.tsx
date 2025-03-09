@@ -28,6 +28,7 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [showPulse, setShowPulse] = useState(!clue.discovered);
   const [showDialogContent, setShowDialogContent] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   
   const dialogRef = useRef<HTMLButtonElement>(null);
   const isActiveClue = gameplayState.activeClueId === clue.id;
@@ -40,17 +41,36 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
     
     return () => clearTimeout(pulseTiming);
   }, [showPulse, clue.discovered]);
+  
+  // Show content whenever the dialog is opened
+  useEffect(() => {
+    if (isDialogOpen) {
+      setShowDialogContent(true);
+    }
+  }, [isDialogOpen]);
 
   // Handle examining a clue
   const handleExamineClueClick = async () => {
+    // Discovery feedback
     if (!clue.discovered) {
+      // Show discovery animation
+      setShowPulse(true);
+      setTimeout(() => setShowPulse(false), 1000);
+      
       onDiscover();
-      setShowPulse(false);
     }
     
     // Examine the clue via our gameplay hook
     handleExamineClue(clue.id);
     setShowDialogContent(true);
+    setIsDialogOpen(true);
+  };
+
+  // Enhanced button text
+  const getButtonText = () => {
+    if (!clue.discovered) return "Investigate Object";
+    if (!clue.examined) return "Examine Closely";
+    return "Review Evidence";
   };
 
   return (
@@ -100,7 +120,7 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
       </CardContent>
       
       <CardFooter>
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild ref={dialogRef}>
             <Button 
               variant={clue.examined ? "outline" : "default"}
@@ -112,9 +132,7 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
               `}
             >
               {!clue.discovered && <span className="mr-2">🔍</span>}
-              {clue.discovered 
-                ? (clue.examined ? "Review Evidence" : "Examine Closely") 
-                : "Investigate Object"}
+              {getButtonText()}
             </Button>
           </DialogTrigger>
           
@@ -150,7 +168,11 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
                   <DialogClose asChild>
                     <Button 
                       variant="outline" 
-                      onClick={() => setShowDialogContent(false)}
+                      onClick={() => {
+                        setShowDialogContent(false);
+                        // Force a small delay before closing to ensure animations complete
+                        setTimeout(() => setIsDialogOpen(false), 100);
+                      }}
                     >
                       Close
                     </Button>

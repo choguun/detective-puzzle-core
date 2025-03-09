@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { useGame } from "@/lib/game-context";
 import useGameplay from "@/lib/use-gameplay";
 import { Clue } from "@/lib/game-context";
 import ClueItem from "./ClueItem";
@@ -19,8 +18,8 @@ export default function GameScene() {
     gameplayState,
     narrativeContent,
     isGeneratingNarrative,
-    handleDiscoverClue,
-    handleChangeScene,
+    handleDiscoverClue: discoverClue,
+    handleChangeScene: changeScene,
     generateSceneNarrative
   } = useGameplay();
   
@@ -79,6 +78,34 @@ export default function GameScene() {
     setImageError(true);
   };
 
+  // Enhanced scene change handler with proper feedback
+  const handleSceneChange = (sceneId: string) => {
+    console.log(`Changing to scene: ${sceneId}`);
+    // Show feedback before changing scene
+    const sceneElement = document.getElementById('scene-description');
+    if (sceneElement) {
+      sceneElement.classList.add('opacity-50');
+      setTimeout(() => sceneElement.classList.remove('opacity-50'), 500);
+    }
+    
+    changeScene(sceneId);
+    // Force reload scene description after short delay
+    setTimeout(() => generateSceneNarrative(), 300);
+  };
+
+  // Enhanced clue discovery handler with visual feedback
+  const handleClueDiscovery = (clueId: string) => {
+    console.log(`Discovering clue: ${clueId}`);
+    // Add visual feedback
+    const clueContainer = document.getElementById('clues-container');
+    if (clueContainer) {
+      clueContainer.classList.add('animate-pulse');
+      setTimeout(() => clueContainer.classList.remove('animate-pulse'), 1000);
+    }
+    
+    discoverClue(clueId);
+  };
+
   // Calculate how many clues have been discovered in the scene
   const discoveredClueCount = visibleClues.filter(clue => clue.discovered).length;
   const totalClueCount = visibleClues.length;
@@ -125,7 +152,7 @@ export default function GameScene() {
                       variant="outline" 
                       size="sm"
                       className="bg-black/50 border-white/20 hover:bg-black/70 text-white"
-                      onClick={() => handleChangeScene(scene.id)}
+                      onClick={() => handleSceneChange(scene.id)}
                     >
                       Go to {scene.name}
                     </Button>
@@ -213,11 +240,12 @@ export default function GameScene() {
       {/* Available Clues */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="clues-container">
         {visibleClues.map((clue) => (
-          <ClueItem 
-            key={clue.id} 
-            clue={clue} 
-            onDiscover={() => handleDiscoverClue(clue.id)} 
-          />
+          <div key={clue.id} id={`clue-${clue.id}`}>
+            <ClueItem 
+              clue={clue} 
+              onDiscover={() => handleClueDiscovery(clue.id)} 
+            />
+          </div>
         ))}
       </div>
       
@@ -232,6 +260,13 @@ export default function GameScene() {
               ))}
             </ul>
           </details>
+        </div>
+      )}
+
+      {isGeneratingNarrative && (
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/50 z-50">
+          <div className="w-10 h-10 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
+          <p className="mt-2 text-white">Loading new scene...</p>
         </div>
       )}
     </div>
