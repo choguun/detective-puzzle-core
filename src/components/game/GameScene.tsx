@@ -288,6 +288,17 @@ export default function GameScene() {
     setShowImagePromptDialog(true);
   };
 
+  // Handle clicking on a quick action prompt
+  const handleQuickAction = (prompt: string) => {
+    setPlayerAction(prompt);
+    
+    // Optional: Automatically execute the action after a short delay
+    // This gives the user a chance to see what was selected
+    setTimeout(() => {
+      handleSceneAction(prompt);
+    }, 300);
+  };
+
   // Toggle showing revised prompt
   const toggleRevisedPrompt = () => {
     setShowRevisedPrompt(prev => !prev);
@@ -296,6 +307,45 @@ export default function GameScene() {
   // Regenerate the narrative description
   const handleRegenerateNarrative = () => {
     regenerateNarrative();
+  };
+
+  // Get scene-specific prompt examples
+  const getSceneSpecificPrompts = (): string[] => {
+    if (!currentScene) return [];
+    
+    // Default prompts that work in any scene
+    const defaultPrompts = [
+      "Examine the room carefully",
+      "Look for hidden objects"
+    ];
+    
+    // Scene-specific prompts
+    const scenePrompts: Record<string, string[]> = {
+      study: [
+        "Search the desk",
+        "Examine the painting",
+        "Check the bookshelf",
+        "Look at the papers",
+        "Inspect the paperweight"
+      ],
+      library: [
+        "Search the bookshelf",
+        "Examine the librarian's desk",
+        "Check the windows",
+        "Look at the catalog",
+        "Inspect the floorboards"
+      ],
+      basement: [
+        "Examine the wall symbols",
+        "Search for hidden containers",
+        "Look for photographs",
+        "Inspect the equipment",
+        "Check for hidden journals"
+      ]
+    };
+    
+    // Return scene-specific prompts if available, otherwise return default prompts
+    return scenePrompts[currentScene.id] || defaultPrompts;
   };
 
   // Start game if not started
@@ -448,6 +498,24 @@ export default function GameScene() {
             >
               {isProcessingAction ? <Spinner size="sm" /> : "Take Action"}
             </Button>
+          </div>
+          
+          {/* Prompt Library - Quick Action Examples */}
+          <div className="mt-3">
+            <div className="text-xs text-gray-400 mb-2">Quick Actions:</div>
+            <div className="flex flex-wrap gap-2">
+              {getSceneSpecificPrompts().map((prompt, index) => (
+                <Button
+                  key={index}
+                  variant="outline"
+                  size="sm"
+                  className="text-xs py-1 px-2 h-auto"
+                  onClick={() => handleQuickAction(prompt)}
+                >
+                  {prompt}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
         
