@@ -9,6 +9,7 @@ import { GameProvider } from '@/lib/game-context';
 import { ThemeProvider } from 'next-themes';
 import { Toaster } from '@/components/ui/sonner';
 import GameLayout from '@/components/game/GameLayout';
+import Link from 'next/link';
 
 export default function LandingPage() {
   // const router = useRouter();
@@ -42,6 +43,17 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-black" />
         </div>
         <div className="z-10 animate-pulse bg-slate-800 rounded-lg w-full max-w-3xl h-[400px]"></div>
+        <div className="text-slate-400 text-sm mt-10">
+          <p>A next-generation detective game powered by AI with wallet authentication.</p>
+          <div className="mt-2 flex flex-wrap gap-4 justify-center">
+            <Link href="/wallet-examples" className="text-blue-400 hover:underline">
+              View On-Chain Transaction Examples →
+            </Link>
+            <Link href="/leaderboard" className="text-amber-400 hover:underline">
+              Check Game Leaderboard →
+            </Link>
+          </div>
+        </div>
       </main>
     );
   }
