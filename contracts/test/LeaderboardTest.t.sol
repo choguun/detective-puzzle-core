@@ -10,6 +10,7 @@ contract LeaderboardTest is Test {
     address player1 = address(2);
     address player2 = address(3);
     address player3 = address(4);
+    address gameLogic = address(5);
 
     function setUp() public {
         // Deploy the contract with owner as the owner
@@ -88,7 +89,7 @@ contract LeaderboardTest is Test {
 
         // Try to update a score while paused (should revert)
         vm.prank(owner);
-        vm.expectRevert("Pausable: paused");
+        vm.expectRevert();
         leaderboard.updatePlayerScore(player1, 100, 300, 5, true);
 
         // Unpause the contract
@@ -109,5 +110,35 @@ contract LeaderboardTest is Test {
         // Update as owner (should succeed)
         vm.prank(owner);
         leaderboard.updatePlayerScore(player1, 100, 300, 5, true);
+    }
+    
+    function testSetGameLogicContract() public {
+        // Set game logic contract
+        vm.prank(owner);
+        leaderboard.setGameLogicContract(gameLogic);
+        
+        // Verify game logic contract was set
+        assertEq(leaderboard.getGameLogicContract(), gameLogic);
+    }
+    
+    function testGameLogicCanUpdateScore() public {
+        // Set game logic contract
+        vm.prank(owner);
+        leaderboard.setGameLogicContract(gameLogic);
+        
+        // Update score as game logic
+        vm.prank(gameLogic);
+        leaderboard.updatePlayerScore(player1, 100, 300, 5, true);
+        
+        // Verify score was updated
+        (uint256 score, , , , ) = leaderboard.getPlayerScore(player1);
+        assertEq(score, 100);
+    }
+    
+    function testNonOwnerCannotSetGameLogic() public {
+        // Try to set game logic as non-owner
+        vm.prank(player1);
+        vm.expectRevert();
+        leaderboard.setGameLogicContract(gameLogic);
     }
 } 

@@ -97,3 +97,53 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - Inspired by classic detective fiction and mystery games
 - Built with modern web technologies and AI capabilities
+
+## Smart Contracts
+
+This project includes a set of Ethereum smart contracts built with Foundry for managing game rewards and leaderboards:
+
+- **DetectiveGameLeaderboard**: Tracks player progress, scores, and game completion status
+- **MysteryToken**: ERC20 token awarded to players for completing scenes and the full game
+- **GameLogic**: Manages game progression, scene completion, and token rewards
+
+### Contract Features
+
+- **Token Rewards**: Players earn MysteryTokens for completing scenes
+- **Leaderboard**: Global leaderboard tracking top scores and completion times
+- **Scene Management**: Game admins can add, update, and manage game scenes
+- **Completion Bonuses**: Special rewards for completing the entire game
+- **Score Calculation**: Scores calculated based on completion time and clues found
+
+### Contract Development
+
+The smart contracts are built using Foundry, a fast and flexible development framework for Ethereum.
+
+1. Install Foundry:
+   ```bash
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
+   ```
+
+2. Build the contracts:
+   ```bash
+   cd contracts
+   forge build
+   ```
+
+3. Run tests:
+   ```bash
+   forge test
+   ```
+
+4. Deploy the contracts:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your network details and private key
+   forge script script/DeployGameContracts.s.sol --rpc-url <RPC_URL> --broadcast --verify
+   ```
+
+## Contract Architecture
+
+- **MysteryToken**: ERC20 token with minting capabilities restricted to the GameLogic contract
+- **GameLogic**: Central contract managing game progression, scene completion, and token rewards
+- **DetectiveGameLeaderboard**: Stores player scores and game completion status

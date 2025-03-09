@@ -33,15 +33,51 @@ contract DetectiveGameLeaderboard is Ownable, Pausable {
     uint256 private bestScore;
     address private bestPlayer;
     
+    // Address of the authorized game logic contract
+    address private gameLogicContract;
+    
     // Events
     event ScoreUpdated(address indexed player, uint256 score, uint256 timeCompleted, uint8 cluesFound);
     event GameCompleted(address indexed player, uint256 finalScore, uint256 timeCompleted);
     event NewTopScore(address indexed player, uint256 score);
+    event GameLogicContractUpdated(address indexed oldAddress, address indexed newAddress);
 
     // Constructor
     constructor() Ownable(msg.sender) {
         bestScore = 0;
         bestPlayer = address(0);
+    }
+    
+    /**
+     * @dev Sets the authorized game logic contract that can update scores
+     * @param _gameLogicContract The address of the game logic contract
+     */
+    function setGameLogicContract(address _gameLogicContract) external onlyOwner {
+        require(_gameLogicContract != address(0), "Leaderboard: game logic cannot be zero address");
+        
+        address oldContract = gameLogicContract;
+        gameLogicContract = _gameLogicContract;
+        
+        emit GameLogicContractUpdated(oldContract, _gameLogicContract);
+    }
+    
+    /**
+     * @dev Returns the current authorized game logic contract
+     * @return The address of the game logic contract
+     */
+    function getGameLogicContract() external view returns (address) {
+        return gameLogicContract;
+    }
+    
+    /**
+     * @dev Modifier to allow only the owner or authorized game logic contract to call a function
+     */
+    modifier onlyAuthorized() {
+        require(
+            msg.sender == owner() || msg.sender == gameLogicContract,
+            "Leaderboard: caller is not authorized"
+        );
+        _;
     }
 
     /**
@@ -58,7 +94,7 @@ contract DetectiveGameLeaderboard is Ownable, Pausable {
         uint256 timeCompleted,
         uint8 cluesFound,
         bool completedGame
-    ) external onlyOwner whenNotPaused {
+    ) external onlyAuthorized whenNotPaused {
         if (!registeredPlayers[player]) {
             playersArray.push(player);
             registeredPlayers[player] = true;
