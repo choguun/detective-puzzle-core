@@ -53,15 +53,18 @@ export default function ClueItem({ clue, onDiscover }: ClueItemProps) {
   const handleExamineClueClick = async () => {
     // Discovery feedback
     if (!clue.discovered) {
-      // Show discovery animation
       setShowPulse(true);
       setTimeout(() => setShowPulse(false), 1000);
-      
       onDiscover();
     }
-    
+
     // Examine the clue via our gameplay hook
     handleExamineClue(clue.id);
+
+    // If your logic needs a local update to "examined", do it here:
+    // E.g., if your context doesn't provide it automatically:
+    // clue.examined = true;
+
     setShowDialogContent(true);
     setIsDialogOpen(true);
   };

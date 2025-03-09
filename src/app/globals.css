@@ -172,3 +172,141 @@
     rgba(255, 204, 0, 0.5) 20px
   );
 }
+
+/* Scene interaction styles */
+.scene-interactive {
+  transition: all 0.2s ease;
+}
+
+.scene-interactive:active {
+  transform: scale(0.99);
+}
+
+.scene-interactive-hover {
+  box-shadow: inset 0 0 30px rgba(255, 255, 255, 0.3);
+}
+
+/* Cursor styles */
+.scene-interactive:hover {
+  cursor: url('/images/magnifying-glass-cursor.png') 12 12, pointer;
+}
+
+/* Animation for clue discovery */
+@keyframes discovery-pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+  }
+  
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.clue-highlight {
+  animation: discovery-pulse 2s infinite;
+}
+
+/* Adding clue mode styles */
+.adding-clue-mode {
+  cursor: crosshair !important;
+  box-shadow: inset 0 0 0 4px rgba(138, 43, 226, 0.7);
+}
+
+.adding-clue-mode:hover::after {
+  content: "+";
+  position: absolute;
+  font-size: 24px;
+  color: white;
+  text-shadow: 0 0 3px black;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+/* Animation for start button */
+@keyframes pulse-button {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.4);
+  }
+  70% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 15px rgba(255, 255, 255, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.animation-pulse {
+  animation: pulse-button 2.5s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* Timer animation */
+@keyframes timer-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.timer-active {
+  position: relative;
+}
+
+.timer-active::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background-color: #ff2d2d;
+  animation: timer-blink 1s infinite;
+}
+
+/* Scene image transition effects */
+.scene-image-transition {
+  transition: background-image 1.5s ease-in-out;
+}
+
+/* Image generation button effects */
+@keyframes generate-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(79, 70, 229, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 70, 229, 0);
+  }
+}
+
+.generate-button {
+  animation: generate-pulse 2s infinite;
+}
+
+/* Image loading placeholder animation */
+@keyframes image-placeholder-animation {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+.image-loading-placeholder {
+  background: linear-gradient(45deg, #1a1a1a, #2a2a2a, #3a3a3a, #2a2a2a, #1a1a1a);
+  background-size: 400% 400%;
+  animation: image-placeholder-animation 15s ease infinite;
+}

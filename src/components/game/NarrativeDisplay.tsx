@@ -16,7 +16,9 @@ export default function NarrativeDisplay({
   isLoading,
   title,
   typingSpeed = 15,
-  highlightTerms = [],
+  highlightTerms = [
+    "clue", "detective", "suspicious", "hidden", "evidence", "analysis",
+  ],
 }: NarrativeDisplayProps) {
   const [displayedContent, setDisplayedContent] = useState("");
   const [isTyping, setIsTyping] = useState(false);
@@ -53,18 +55,23 @@ export default function NarrativeDisplay({
     
     if (safeContent && safeContent !== displayedContent && !skipTypewriter) {
       setIsTyping(true);
-      let index = 0;
+      
+      // Use a ref to track the index instead of a local variable that gets recreated
+      const indexRef = { current: 0 };
+      
       const timer = setInterval(() => {
         try {
-          if (index < safeContent.length) {
-            setDisplayedContent(safeContent.substring(0, index + 1));
-            index++;
+          if (indexRef.current < safeContent.length) {
+            // Update displayed content with the next character
+            setDisplayedContent(safeContent.substring(0, indexRef.current + 1));
+            indexRef.current++;
             
             // Auto-scroll to keep up with the text
             if (contentRef.current) {
               contentRef.current.scrollTop = contentRef.current.scrollHeight;
             }
           } else {
+            // We've reached the end of the text
             clearInterval(timer);
             setIsTyping(false);
             highlightImportantTerms(safeContent);

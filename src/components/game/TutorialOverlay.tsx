@@ -16,7 +16,7 @@ interface TutorialStep {
 export default function TutorialOverlay({ onComplete }: { onComplete: () => void }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
-  const { gameState } = useGame();
+  const { isGameStarted, completeTutorial } = useGame();
 
   // Define tutorial steps
   const tutorialSteps: TutorialStep[] = [
@@ -35,14 +35,21 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
     },
     {
       title: "Discovering Clues",
-      description: "These are potential clues. Click on 'Investigate Object' to discover what they are.",
+      description: "You'll need to take actions to discover clues. Type detective actions like 'examine the desk' or 'look at the painting'.",
       position: "bottom",
       targetElement: "clues-container",
       action: "Next"
     },
     {
-      title: "Your Detective's Notebook",
-      description: "Click the notebook icon to access your notes, evidence board, and case analysis.",
+      title: "Taking Actions",
+      description: "Type your detective actions here to investigate objects and discover clues. Be specific about what you want to examine.",
+      position: "bottom",
+      targetElement: "action-input",
+      action: "Next"
+    },
+    {
+      title: "Your Notebook",
+      description: "Click the notebook button to access your detective's notes and store your thoughts about the case.",
       position: "bottom-right",
       targetElement: "notebook-toggle",
       action: "Next"
@@ -56,7 +63,7 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
     },
     {
       title: "Solving the Case",
-      description: "After examining at least 3 clues, you can attempt to solve the case from your notebook.",
+      description: "Find all the clues in each scene to solve the mystery. Each scene has 5 hidden clues to discover.",
       position: "center",
       action: "Start Investigating"
     }
@@ -68,7 +75,7 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
       setCurrentStep(currentStep + 1);
     } else {
       setIsVisible(false);
-      localStorage.setItem("tutorialCompleted", "true");
+      completeTutorial();
       onComplete();
     }
   };
@@ -76,7 +83,7 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
   // Skip the tutorial
   const handleSkip = () => {
     setIsVisible(false);
-    localStorage.setItem("tutorialCompleted", "true");
+    completeTutorial();
     onComplete();
   };
 
@@ -103,17 +110,21 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
     
     if (!targetElement) return null;
     
-    // This is a simplified version. In a full implementation, 
-    // you would get the actual element position and draw the highlight accordingly
+    // Find the element in the DOM
+    const element = document.getElementById(targetElement);
+    if (!element) return null;
+    
+    // Get element position
+    const rect = element.getBoundingClientRect();
+    
     return (
       <div 
         className="absolute border-2 border-primary animate-pulse rounded-md"
         style={{
-          // These would be calculated based on the target element's position
-          top: "50%",
-          left: "50%",
-          width: "200px",
-          height: "100px",
+          top: `${rect.top - 4}px`,
+          left: `${rect.left - 4}px`,
+          width: `${rect.width + 8}px`,
+          height: `${rect.height + 8}px`,
           zIndex: 40,
           pointerEvents: "none"
         }}
@@ -121,7 +132,7 @@ export default function TutorialOverlay({ onComplete }: { onComplete: () => void
     );
   };
 
-  if (!isVisible || !gameState.gameStarted) return null;
+  if (!isVisible || !isGameStarted) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

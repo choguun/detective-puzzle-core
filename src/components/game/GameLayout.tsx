@@ -11,8 +11,13 @@ import TutorialOverlay from "./TutorialOverlay";
 import HelpMenu from "./HelpMenu";
 
 export default function GameLayout() {
-  const { gameState, startGame, resetGame } = useGame();
-  const { gameStarted, gameCompleted, gameProgress } = gameState;
+  const { 
+    isGameStarted, 
+    startGame, 
+    isTutorialCompleted,
+    completeTutorial
+  } = useGame();
+  
   const { theme, setTheme } = useTheme();
   
   const [showNotebook, setShowNotebook] = useState(false);
@@ -28,19 +33,14 @@ export default function GameLayout() {
 
   // Check if tutorial was completed before
   useEffect(() => {
-    if (gameStarted && !localStorage.getItem("tutorialCompleted")) {
+    if (isGameStarted && !isTutorialCompleted) {
       setShowTutorial(true);
     }
-  }, [gameStarted]);
+  }, [isGameStarted, isTutorialCompleted]);
 
   // Handle starting a new game
   const handleStartGame = () => {
     startGame();
-  };
-
-  // Handle resetting the game
-  const handleResetGame = () => {
-    resetGame();
   };
 
   // Toggle notebook visibility
@@ -58,11 +58,11 @@ export default function GameLayout() {
         <h4 className="font-semibold">Game Mechanics:</h4>
         <ul className="list-disc list-inside space-y-1">
           <li>Explore different scenes to discover clues</li>
-          <li>Click on objects to investigate them closely</li>
-          <li>Examine clues to gather important information</li>
+          <li>Take actions to investigate objects in the scene</li>
+          <li>Each scene contains 5 hidden clues to discover</li>
           <li>Take notes in your detective notebook</li>
-          <li>Analyze your findings to make connections</li>
-          <li>Solve the case when you feel confident</li>
+          <li>Complete a scene by finding all its clues</li>
+          <li>Explore all scenes to solve the case</li>
         </ul>
       </div>
       
@@ -70,9 +70,9 @@ export default function GameLayout() {
         <h4 className="font-semibold">Tips:</h4>
         <ul className="list-disc list-inside space-y-1">
           <li>Pay close attention to details in scene descriptions</li>
-          <li>Take thorough notes of your observations</li>
-          <li>Look for connections between different pieces of evidence</li>
-          <li>You need to examine at least 3 clues before solving the case</li>
+          <li>Be specific in your actions (e.g., &quot;examine the desk&quot; rather than just &quot;look&quot;)</li>
+          <li>Use the hints feature if you get stuck</li>
+          <li>Complete all scenes to solve the mystery</li>
         </ul>
       </div>
     </div>
@@ -81,6 +81,7 @@ export default function GameLayout() {
   // Handle tutorial completion
   const handleTutorialComplete = () => {
     setShowTutorial(false);
+    completeTutorial();
   };
   
   // Add a function to manually show the tutorial
@@ -91,7 +92,7 @@ export default function GameLayout() {
   // Don't render with hydration mismatch
   if (!mounted) return null;
 
-  if (!gameStarted) {
+  if (!isGameStarted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-cover bg-center opacity-20 z-0" 
@@ -151,41 +152,6 @@ export default function GameLayout() {
     );
   }
 
-  if (gameCompleted) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 relative">
-        <div className="absolute inset-0 bg-cover bg-center opacity-10 z-0" 
-          style={{backgroundImage: "url('/images/detective-success.jpg')"}}></div>
-        
-        <div className="max-w-3xl text-center space-y-6 z-10 relative">
-          <div className="inline-block bg-primary/20 p-4 rounded-full mb-4">
-            <div className="text-5xl">🏆</div>
-          </div>
-          
-          <h1 className="text-4xl font-bold font-serif">Case Closed</h1>
-          <p className="text-xl">
-            Congratulations, detective! You have successfully solved the case.
-          </p>
-          
-          <div className="flex justify-center gap-4 pt-4">
-            <Button variant="outline" onClick={toggleNotebook}>
-              {showNotebook ? "Hide" : "View"} Case Files
-            </Button>
-            <Button onClick={handleResetGame} className="bg-primary hover:bg-primary/90">
-              Start New Case
-            </Button>
-          </div>
-          
-          {showNotebook && (
-            <div className="mt-8 w-full max-w-3xl mx-auto">
-              <DetectiveNotebook />
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="container mx-auto py-6 px-4 space-y-6 relative min-h-screen">
       {/* Atmospheric overlay for dark mode */}
@@ -234,10 +200,10 @@ export default function GameLayout() {
       <div className="w-full bg-muted rounded-full h-2.5 relative z-10">
         <div 
           className="bg-primary h-2.5 rounded-full transition-all duration-500" 
-          style={{ width: `${gameProgress}%` }}
+          style={{ width: `0%` }}
         ></div>
         <div className="absolute -top-7 right-0 text-xs">
-          Case Progress: {gameProgress}%
+          Case Progress: Investigating...
         </div>
       </div>
       
@@ -249,36 +215,37 @@ export default function GameLayout() {
         
         {/* Detective's Notebook */}
         {showNotebook && (
-          <div className="lg:w-1/2">
+          <div className="lg:w-1/2 h-[700px] overflow-auto">
             <DetectiveNotebook />
           </div>
         )}
       </div>
       
-      {/* Notebook Toggle */}
-      <div className="fixed bottom-6 right-6 z-20">
+      {/* Bottom Actions */}
+      <div className="flex justify-between items-center z-10 relative">
         <Button 
+          variant="outline" 
           onClick={toggleNotebook}
-          variant="outline"
-          className="rounded-full w-14 h-14 flex items-center justify-center shadow-lg border-2"
-          title={showNotebook ? "Close Notebook" : "Open Detective's Notebook"}
+          className="flex-shrink-0"
           id="notebook-toggle"
         >
-          {showNotebook ? '📕' : '📖'}
+          {showNotebook ? "Hide Notebook" : "View Notebook"}
         </Button>
+        
+        <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Detective&apos;s Handbook</DialogTitle>
+            </DialogHeader>
+            {renderInstructions()}
+          </DialogContent>
+        </Dialog>
       </div>
       
-      {/* Instructions Dialog */}
-      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Detective&apos;s Handbook</DialogTitle>
-          </DialogHeader>
-          {renderInstructions()}
-        </DialogContent>
-      </Dialog>
-      
-      {showTutorial && <TutorialOverlay onComplete={handleTutorialComplete} />}
+      {/* Tutorial Overlay */}
+      {showTutorial && (
+        <TutorialOverlay onComplete={handleTutorialComplete} />
+      )}
     </div>
   );
 } 

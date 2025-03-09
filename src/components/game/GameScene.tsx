@@ -1,274 +1,637 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Card } from "@/components/ui/card";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import useGameplay from "@/lib/use-gameplay";
-import { Clue } from "@/lib/game-context";
+import { processSceneAction, ActionResponse } from "@/lib/action-processor";
 import ClueItem from "./ClueItem";
-import NarrativeDisplay from "./NarrativeDisplay";
+import Spinner from "../ui/spinner";
+import GameTimer from "./GameTimer";
+import SceneSelector from "./SceneSelector";
 
 export default function GameScene() {
-  // Use our enhanced gameplay hook instead of directly accessing context
-  const { 
-    currentScene, 
-    allClues,
-    allScenes,
-    gameplayState,
-    narrativeContent,
-    isGeneratingNarrative,
-    handleDiscoverClue: discoverClue,
-    handleChangeScene: changeScene,
-    generateSceneNarrative
+  // Game context
+  const {
+    currentScene,
+    availableScenes,
+    discoveredClues,
+    discoveredClueIds,
+    discoverClue,
+    generateImage,
+    sceneImageUrl,
+    currentNarrative,
+    regenerateNarrative,
+    totalSeconds,
+    isTimerRunning,
+    isGameStarted,
+    startGame
   } = useGameplay();
+
+  // Router
+  const router = useRouter();
+
+  // Refs
+  const sceneRef = useRef<HTMLDivElement>(null);
+  const actionInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // State for player action
+  const [playerAction, setPlayerAction] = useState<string>("");
+  const [isProcessingAction, setIsProcessingAction] = useState<boolean>(false);
+
+  // State for mouse position
+  const [mousePosition, setMousePosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Image generation state
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
+  const [customImagePrompt, setCustomImagePrompt] = useState<string>("");
+  const [showImagePromptDialog, setShowImagePromptDialog] = useState<boolean>(false);
+  const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
+  const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
+  const [showRevisedPrompt, setShowRevisedPrompt] = useState<boolean>(false);
+
+  // Action state
+  const [actionResponse, setActionResponse] = useState<string | null>(null);
+  const [actionHistory, setActionHistory] = useState<ActionResponse[]>([]);
+
+  // Scene completion tracking
+  const [completedScenes, setCompletedScenes] = useState<Record<string, boolean>>({});
+  const [showSceneCompletionDialog, setShowSceneCompletionDialog] = useState<boolean>(false);
   
-  const [imageError, setImageError] = useState<boolean>(false);
-  const [visibleClues, setVisibleClues] = useState<Clue[]>([]);
-  const [showHints, setShowHints] = useState<boolean>(false);
-  const sceneBgRef = useRef<HTMLDivElement>(null);
+  // Feedback state
+  const [actionFeedback, setActionFeedback] = useState<{message: string, type: string} | null>(null);
 
-  // Get the clues available in the current scene
-  useEffect(() => {
-    const cluesInScene = allClues.filter(clue => 
-      currentScene.availableClues.includes(clue.id)
+  // Define showActionFeedback first, before any useCallback that depends on it
+  const showActionFeedback = useCallback((message: string, type: "success" | "error" | "info") => {
+    setActionFeedback({ message, type });
+    
+    // Auto-clear after delay
+    setTimeout(() => {
+      setActionFeedback(null);
+    }, 3000);
+  }, []);
+
+  // Check if all clues in the current scene have been discovered
+  const checkSceneCompletion = useCallback(() => {
+    if (!currentScene) return;
+    
+    // Don't check already completed scenes
+    if (completedScenes[currentScene.id]) return;
+    
+    // Get all clues in this scene
+    const sceneClues = currentScene.clueIds || [];
+    
+    // Check if all clues are discovered
+    const allDiscovered = sceneClues.every(clueId => 
+      discoveredClueIds.includes(clueId)
     );
-    setVisibleClues(cluesInScene);
-  }, [currentScene, allClues]);
+    
+    if (allDiscovered && sceneClues.length > 0) {
+      // Mark scene as completed
+      setCompletedScenes(prev => ({
+        ...prev,
+        [currentScene.id]: true
+      }));
+      
+      // Show completion dialog
+      setShowSceneCompletionDialog(true);
+      
+      // Show success message
+      showActionFeedback(
+        `You've discovered all clues in the ${currentScene.name}!`, 
+        "success"
+      );
+    }
+  }, [currentScene, completedScenes, discoveredClueIds, showActionFeedback]);
 
-  // Add parallax effect to scene background on mouse move
+  // Check completion when discovered clues change
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (sceneBgRef.current && !imageError) {
-        const { left, top, width, height } = sceneBgRef.current.getBoundingClientRect();
-        const x = (e.clientX - left) / width - 0.5;
-        const y = (e.clientY - top) / height - 0.5;
-        
-        sceneBgRef.current.style.transform = `
-          perspective(1000px)
-          rotateY(${x * 2}deg)
-          rotateX(${y * -2}deg)
-          scale(1.03)
-        `;
-      }
-    };
-    
-    const handleMouseLeave = () => {
-      if (sceneBgRef.current) {
-        sceneBgRef.current.style.transform = `
-          perspective(1000px)
-          rotateY(0deg)
-          rotateX(0deg)
-          scale(1)
-        `;
-      }
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseleave', handleMouseLeave);
-    
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, [imageError]);
+    checkSceneCompletion();
+  }, [discoveredClueIds, currentScene, checkSceneCompletion]);
 
-  // Handle image error
+  // Format timer display
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Handle mouse movement
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!sceneRef.current) return;
+    
+    const rect = sceneRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    
+    setMousePosition({ x, y });
+  };
+
+  // Handle mouse leave
+  const handleMouseLeave = () => {
+    setMousePosition(null);
+  };
+
+  // Handle image loading error
   const handleImageError = () => {
-    setImageError(true);
+    // If the image fails to load, try loading a default image
+    setBackgroundImageUrl("/images/detective-background.jpg");
   };
 
-  // Enhanced scene change handler with proper feedback
+  // Handle scene change
   const handleSceneChange = (sceneId: string) => {
-    console.log(`Changing to scene: ${sceneId}`);
-    // Show feedback before changing scene
-    const sceneElement = document.getElementById('scene-description');
-    if (sceneElement) {
-      sceneElement.classList.add('opacity-50');
-      setTimeout(() => sceneElement.classList.remove('opacity-50'), 500);
-    }
+    if (!sceneId || !availableScenes) return;
     
-    changeScene(sceneId);
-    // Force reload scene description after short delay
-    setTimeout(() => generateSceneNarrative(), 300);
+    // If we have navigation confirmation for important scenes, add it here
+    
+    console.log(`Changing scene to: ${sceneId}`);
+    
+    // Reset the scene-specific state
+    setActionResponse(null);
+    setMousePosition(null);
+    setBackgroundImageUrl(null);
+    
+    // Change the scene in the game context
+    router.push(`/game/${sceneId}`);
+    
+    // Force reload scene description
+    regenerateNarrative();
   };
 
-  // Enhanced clue discovery handler with visual feedback
+  // Handle clue discovery through player actions
   const handleClueDiscovery = (clueId: string) => {
+    // Prevent discovering already found clues
+    if (discoveredClueIds.includes(clueId)) return;
+    
     console.log(`Discovering clue: ${clueId}`);
-    // Add visual feedback
-    const clueContainer = document.getElementById('clues-container');
-    if (clueContainer) {
-      clueContainer.classList.add('animate-pulse');
-      setTimeout(() => clueContainer.classList.remove('animate-pulse'), 1000);
+    
+    // Add to discovered clues
+    discoverClue(clueId);
+    
+    // Visual feedback
+    showActionFeedback("You've discovered a new clue!", "success");
+    
+    // Play clue discovery animation/sound here if needed
+    const clueElement = document.getElementById(`clue-${clueId}`);
+    if (clueElement) {
+      clueElement.classList.add("discovered-animation");
+      setTimeout(() => {
+        clueElement.classList.remove("discovered-animation");
+      }, 1500);
     }
     
-    discoverClue(clueId);
+    // Check if all clues are discovered
+    checkSceneCompletion();
   };
 
-  // Calculate how many clues have been discovered in the scene
-  const discoveredClueCount = visibleClues.filter(clue => clue.discovered).length;
-  const totalClueCount = visibleClues.length;
-  const clueProgress = Math.floor((discoveredClueCount / totalClueCount) * 100);
+  // Handle player action in the scene  
+  const handleSceneAction = async (action: string) => {
+    if (!action.trim() || !currentScene) return;
+    
+    try {
+      setIsProcessingAction(true);
+      setActionResponse(null);
+      
+      // Process action
+      const response = await processSceneAction({
+        action,
+        scene: currentScene,
+        discoveredClues: discoveredClues,
+        playerContext: actionHistory.map(a => a.content).join("\n")
+      });
+      
+      // Update UI with the response
+      setActionResponse(response.content);
+      
+      // Add to action history
+      setActionHistory(prev => [...prev, response]);
+      
+      // Check if any clues were found
+      if (response.revealedClues && response.revealedClues.length > 0) {
+        response.revealedClues.forEach(clueId => {
+          if (currentScene.clueIds.includes(clueId)) {
+            handleClueDiscovery(clueId);
+          }
+        });
+      }
+      
+      // Show success or hint feedback
+      if (response.success) {
+        showActionFeedback("Your action was successful!", "success");
+      } else if (response.hintGiven) {
+        showActionFeedback("You've received a hint!", "info");
+      }
+      
+      // Clear the action input
+      setPlayerAction("");
+      
+    } catch (error) {
+      console.error("Error processing action:", error);
+      showActionFeedback("There was a problem processing your action. Please try again.", "error");
+    } finally {
+      setIsProcessingAction(false);
+    }
+  };
 
-  // Determine scene transition effect
-  const sceneTransition = gameplayState.narrativeFocus === 'scene' && isGeneratingNarrative;
+  // Move to next scene after completing current one
+  const handleMoveToNextScene = () => {
+    // Close the dialog
+    setShowSceneCompletionDialog(false);
+    
+    // If we have a predefined order, we can automatically move to the next scene
+    if (availableScenes && currentScene) {
+      const currentIndex = availableScenes.findIndex(s => s.id === currentScene.id);
+      if (currentIndex >= 0 && currentIndex < availableScenes.length - 1) {
+        const nextScene = availableScenes[currentIndex + 1];
+        handleSceneChange(nextScene.id);
+      }
+    }
+  };
+
+  // UI for displaying hints
+  const [showHints, setShowHints] = useState<boolean>(false);
+  
+  // Toggle hints display
+  const toggleHints = () => {
+    setShowHints(prev => !prev);
+  };
+
+  // Generate narrative/scene description
+  const handleGenerateSceneImage = async (customPrompt?: string) => {
+    try {
+      setIsGeneratingImage(true);
+      
+      // Generate image using the game context function
+      const result = await generateImage(customPrompt);
+      
+      // Store the revised prompt if provided
+      if (result && result.revisedPrompt) {
+        setRevisedPrompt(result.revisedPrompt);
+      }
+      
+      setShowImagePromptDialog(false);
+      setCustomImagePrompt("");
+      
+    } catch (error) {
+      console.error("Error generating image:", error);
+      showActionFeedback("There was a problem generating the image. Please try again.", "error");
+    } finally {
+      setIsGeneratingImage(false);
+    }
+  };
+
+  // Handle opening the prompt dialog
+  const handleOpenPromptDialog = () => {
+    setShowImagePromptDialog(true);
+  };
+
+  // Toggle showing revised prompt
+  const toggleRevisedPrompt = () => {
+    setShowRevisedPrompt(prev => !prev);
+  };
+
+  // Regenerate the narrative description
+  const handleRegenerateNarrative = () => {
+    regenerateNarrative();
+  };
+
+  // Start game if not started
+  useEffect(() => {
+    if (!isGameStarted) {
+      startGame();
+    }
+  }, [isGameStarted, startGame]);
+
+  // Set background image when scene changes
+  useEffect(() => {
+    if (!currentScene) return;
+    
+    if (currentScene.backgroundImage) {
+      setBackgroundImageUrl(currentScene.backgroundImage);
+    } else if (currentScene.imageUrl) {
+      setBackgroundImageUrl(currentScene.imageUrl);
+    } else {
+      setBackgroundImageUrl("/images/detective-background.jpg");
+    }
+  }, [currentScene]);
+
+  // Focus action input on mount
+  useEffect(() => {
+    if (actionInputRef.current) {
+      actionInputRef.current.focus();
+    }
+  }, []);
+
+  // If no current scene, show loading or redirect
+  if (!currentScene) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+        <div className="text-center">
+          <Spinner size="lg" />
+          <p className="mt-4">Loading scene...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={`flex flex-col gap-6 w-full max-w-4xl mx-auto ${sceneTransition ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
-      {/* Scene Background */}
-      <div className="relative">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[calc(100vh-64px)] bg-gray-900 text-white">
+      {/* Left Column - Scene Image & Clues */}
+      <div className="md:col-span-2 relative overflow-hidden rounded-lg">
         <div 
-          ref={sceneBgRef}
-          className="w-full h-80 rounded-lg bg-cover bg-center relative transition-transform duration-200 overflow-hidden"
-          style={{ 
-            backgroundColor: imageError ? '#1a1a1a' : undefined,
-            backgroundImage: !imageError ? `url(${currentScene.backgroundImage})` : undefined,
-            backgroundSize: 'cover',
-            transformStyle: 'preserve-3d'
-          }}
+          ref={sceneRef}
+          className="relative w-full h-[60vh] md:h-[70vh] bg-black/50 overflow-hidden rounded-lg"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
         >
-          {imageError && (
+          {/* Scene Background */}
+          {backgroundImageUrl && (
+            <Image
+              src={backgroundImageUrl}
+              alt={currentScene.name}
+              fill
+              className="object-cover opacity-75"
+              priority
+              onError={handleImageError}
+            />
+          )}
+          
+          {/* Scene Generated Image Overlay */}
+          {sceneImageUrl && (
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-4xl opacity-30">🔍</div>
+              <Image
+                src={sceneImageUrl}
+                alt={`Generated scene: ${currentScene.name}`}
+                width={800}
+                height={600}
+                className="max-h-full max-w-full object-contain opacity-90 z-10"
+              />
             </div>
           )}
           
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm rounded-lg flex items-center justify-center">
-            <div className="text-center text-white p-4 bg-black/40 rounded-lg backdrop-blur-md">
-              <h2 className="text-3xl font-bold mb-2 font-serif">{currentScene.name}</h2>
-              <p className="text-sm opacity-80">{currentScene.description}</p>
-            </div>
-          </div>
-          
-          {/* Scene navigation buttons */}
-          <div className="absolute bottom-4 right-4 flex space-x-2" id="scene-navigation">
-            {allScenes
-              .filter(scene => scene.id !== currentScene.id)
-              .map(scene => (
-                <HoverCard key={scene.id}>
-                  <HoverCardTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      className="bg-black/50 border-white/20 hover:bg-black/70 text-white"
-                      onClick={() => handleSceneChange(scene.id)}
-                    >
-                      Go to {scene.name}
-                    </Button>
-                  </HoverCardTrigger>
-                  <HoverCardContent className="w-80">
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-semibold">{scene.name}</h4>
-                      <p className="text-xs">{scene.description}</p>
-                    </div>
-                  </HoverCardContent>
-                </HoverCard>
-              ))}
-          </div>
-          
-          {/* Hidden image to check if it loads */}
-          <img 
-            src={currentScene.backgroundImage} 
-            alt="" 
-            className="hidden" 
-            onError={handleImageError}
-          />
-          
-          {/* Clue progress indicator */}
-          <div className="absolute top-4 left-4 flex items-center space-x-2">
-            <div className="bg-black/50 px-3 py-1 rounded-full backdrop-blur-sm flex items-center text-white text-xs">
-              <span className="mr-2">Clues:</span>
-              <span className="font-bold">{discoveredClueCount}/{totalClueCount}</span>
-              <div className="ml-2 w-20 h-2 bg-white/20 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-primary transition-all duration-500" 
-                  style={{width: `${clueProgress}%`}}
+          {/* Clues Container (now hidden from direct clicking, only via actions) */}
+          <div 
+            id="clues-container"
+            className="absolute inset-0 z-20 pointer-events-none" 
+          >
+            {/* Discovered clues will be visualized here as they're found through actions */}
+            {discoveredClues.filter(clue => clue.sceneId === currentScene.id).map(clue => (
+              <div
+                key={clue.id}
+                id={`clue-${clue.id}`}
+                className="clue-item opacity-75 hover:opacity-100 transition-opacity pointer-events-none"
+              >
+                <ClueItem 
+                  clue={clue} 
+                  onDiscover={() => {}} 
+                  key={clue.id}
                 />
               </div>
+            ))}
+          </div>
+          
+          {/* Mouse position indicator (debug only) */}
+          {mousePosition && (
+            <div 
+              className="absolute w-2 h-2 bg-red-500 rounded-full z-30 hidden"
+              style={{ 
+                left: `${mousePosition.x}%`, 
+                top: `${mousePosition.y}%` 
+              }}
+            />
+          )}
+          
+          {/* Action Feedback */}
+          {actionFeedback && (
+            <div 
+              className={`absolute bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg z-50 transition-opacity duration-300 ${
+                actionFeedback.type === "success" ? "bg-green-600" : 
+                actionFeedback.type === "error" ? "bg-red-600" : 
+                "bg-blue-600"
+              }`}
+            >
+              {actionFeedback.message}
             </div>
+          )}
+          
+          {/* Loading overlay */}
+          {isGeneratingImage && (
+            <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-40">
+              <div className="text-center">
+                <Spinner size="lg" />
+                <p className="mt-4">Generating scene image...</p>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Action Input */}
+        <div className="mt-4 px-4">
+          <div className="relative">
+            <Textarea
+              ref={actionInputRef}
+              value={playerAction}
+              onChange={(e) => setPlayerAction(e.target.value)}
+              placeholder="What would you like to do? (e.g., 'Examine the desk', 'Look at the painting')"
+              className="w-full p-3 bg-gray-800 text-white border-gray-700 rounded-lg"
+              rows={2}
+              disabled={isProcessingAction}
+              id="action-input"
+            />
+            <Button
+              onClick={() => handleSceneAction(playerAction)}
+              disabled={!playerAction.trim() || isProcessingAction}
+              className="absolute right-2 bottom-2 bg-blue-600 hover:bg-blue-500"
+            >
+              {isProcessingAction ? <Spinner size="sm" /> : "Take Action"}
+            </Button>
           </div>
         </div>
         
-        {/* Detective hints */}
-        <Button
-          variant="link"
-          size="sm" 
-          className="text-xs absolute -bottom-6 right-0 text-muted-foreground"
-          onClick={() => setShowHints(!showHints)}
-        >
-          {showHints ? "Hide Detective's Insights" : "Show Detective's Insights"}
-        </Button>
-      </div>
-
-      {/* Scene Description */}
-      <Card className="p-6 detective-paper relative" id="scene-description">
-        {showHints && gameplayState.hints.length > 0 && (
-          <div className="absolute -top-4 right-6 bg-yellow-100 dark:bg-yellow-900/50 p-3 rounded-lg shadow-md border border-yellow-200 dark:border-yellow-800 max-w-xs z-10">
-            <h4 className="text-sm font-bold mb-1">Detective&apos;s Insights:</h4>
-            <ul className="text-xs space-y-1 list-disc list-inside">
-              {gameplayState.hints.map((hint, index) => (
-                <li key={index}>{hint}</li>
+        {/* Action Response */}
+        {actionResponse && (
+          <div className="mt-4 p-4 bg-gray-800 rounded-lg">
+            <h3 className="font-semibold mb-2">Results:</h3>
+            <div className="prose prose-invert max-w-none">
+              {actionResponse.split('\n').map((paragraph, i) => (
+                <p key={i} className={paragraph.includes("*You found") ? "text-green-400 font-semibold" : ""}>{paragraph}</p>
               ))}
-            </ul>
+            </div>
           </div>
         )}
+      </div>
+      
+      {/* Right Column - Scene Info & Navigation */}
+      <div className="p-4 bg-gray-800 rounded-lg flex flex-col h-[70vh] md:h-[80vh] overflow-y-auto">
+        {/* Scene Name & Timer */}
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">{currentScene.name}</h2>
+          <GameTimer 
+            seconds={totalSeconds} 
+            isRunning={isTimerRunning} 
+            format={formatTime}
+          />
+        </div>
         
-        <div className="fingerprint-overlay"></div>
-        <NarrativeDisplay 
-          content={narrativeContent} 
-          isLoading={isGeneratingNarrative} 
-          title="Scene Investigation"
-          highlightTerms={["clue", "suspicious", "mysterious", "hidden", "important", "notice"]}
-        />
-        
-        {/* Regenerate description button */}
-        {!isGeneratingNarrative && (
-          <div className="mt-4 flex justify-end">
+        {/* Scene Description */}
+        <div id="scene-description" className="mb-6">
+          <h3 className="text-lg font-semibold mb-2">Scene Description</h3>
+          <div className="prose prose-invert max-w-none">
+            {currentNarrative ? (
+              <div>
+                {currentNarrative.split('\n').map((paragraph, i) => (
+                  paragraph.trim() ? <p key={i}>{paragraph}</p> : null
+                ))}
+              </div>
+            ) : (
+              <p>{currentScene.description}</p>
+            )}
+          </div>
+          <div className="flex space-x-2 mt-2">
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => generateSceneNarrative()}
+              onClick={handleRegenerateNarrative}
               className="text-xs"
             >
-              Investigate Again
+              Refresh Description
             </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleOpenPromptDialog}
+              className="text-xs"
+            >
+              Generate Scene Image
+            </Button>
+            {revisedPrompt && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={toggleRevisedPrompt}
+                className="text-xs"
+              >
+                {showRevisedPrompt ? "Hide Prompt" : "Show Prompt"}
+              </Button>
+            )}
           </div>
-        )}
-      </Card>
-
-      {/* Available Clues */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="clues-container">
-        {visibleClues.map((clue) => (
-          <div key={clue.id} id={`clue-${clue.id}`}>
-            <ClueItem 
-              clue={clue} 
-              onDiscover={() => handleClueDiscovery(clue.id)} 
-            />
-          </div>
-        ))}
+          {showRevisedPrompt && revisedPrompt && (
+            <div className="mt-2 p-2 bg-gray-700 rounded text-xs">
+              <p>Revised prompt: {revisedPrompt}</p>
+            </div>
+          )}
+        </div>
+        
+        {/* Discovered Clues */}
+        <div id="discovered-clues" className="mb-6">
+          <h3 className="text-lg font-semibold mb-2">Discovered Clues</h3>
+          {discoveredClues.filter(clue => clue.sceneId === currentScene.id).length > 0 ? (
+            <div className="space-y-2">
+              {discoveredClues
+                .filter(clue => clue.sceneId === currentScene.id)
+                .map(clue => (
+                  <div key={clue.id} className="p-2 bg-gray-700 rounded">
+                    <h4 className="font-medium">{clue.name}</h4>
+                    <p className="text-sm text-gray-300">{clue.description}</p>
+                  </div>
+                ))
+              }
+              <div className="text-sm text-gray-400 mt-1">
+                Found {discoveredClues.filter(clue => clue.sceneId === currentScene.id).length} of {currentScene.clueIds?.length || 0} clues
+              </div>
+            </div>
+          ) : (
+            <p className="text-gray-400">No clues discovered in this scene yet. Try taking actions to find clues!</p>
+          )}
+        </div>
+        
+        {/* Scene Navigation */}
+        <div className="mt-auto" id="scene-navigation">
+          <h3 className="text-lg font-semibold mb-2">Change Location</h3>
+          <SceneSelector 
+            scenes={availableScenes} 
+            currentSceneId={currentScene.id}
+            onSceneChange={handleSceneChange}
+            completedScenes={completedScenes}
+          />
+        </div>
+        
+        {/* Hints Button */}
+        <div className="mt-4">
+          <Button 
+            variant="outline" 
+            onClick={toggleHints}
+            className="w-full"
+          >
+            {showHints ? "Hide Hints" : "Show Hints"}
+          </Button>
+          
+          {showHints && (
+            <div className="mt-2 p-3 bg-gray-700 rounded">
+              <h4 className="font-medium mb-1">Investigation Tips:</h4>
+              <ul className="text-sm space-y-1 list-disc list-inside">
+                <li>Try examining specific objects mentioned in the scene description</li>
+                <li>Use verbs like &quot;examine&quot;, &quot;search&quot;, &quot;open&quot;, or &quot;look at&quot;</li>
+                <li>If stuck, try thinking about what a real detective would do</li>
+                <li>Sometimes you need to find one clue before others become available</li>
+                <li>All scenes have 5 clues to discover through actions</li>
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
       
-      {/* Game activity log - shows recent actions */}
-      {gameplayState.playerActions.length > 0 && (
-        <div className="mt-6 border-t pt-4">
-          <details className="text-sm">
-            <summary className="font-medium cursor-pointer">Detective&apos;s Activity Log</summary>
-            <ul className="mt-2 space-y-1 text-muted-foreground text-xs">
-              {gameplayState.playerActions.slice(0, 5).map((action, idx) => (
-                <li key={idx} className="font-mono">{action}</li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      )}
-
-      {isGeneratingNarrative && (
-        <div className="fixed inset-0 flex flex-col items-center justify-center bg-black/50 z-50">
-          <div className="w-10 h-10 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
-          <p className="mt-2 text-white">Loading new scene...</p>
-        </div>
-      )}
+      {/* Scene Completion Dialog */}
+      <Dialog open={showSceneCompletionDialog} onOpenChange={setShowSceneCompletionDialog}>
+        <DialogContent className="bg-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Scene Completed!</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="mb-2">You&#39;ve discovered all the clues in this location. Excellent detective work!</p>
+            <p>Ready to continue your investigation in another location?</p>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleMoveToNextScene}
+              className="bg-green-600 hover:bg-green-500"
+            >
+              Continue to Next Scene
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Custom Image Prompt Dialog */}
+      <Dialog open={showImagePromptDialog} onOpenChange={setShowImagePromptDialog}>
+        <DialogContent className="bg-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Generate Scene Image</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="mb-4">Enter a custom prompt to generate an image for this scene, or leave blank to use the default description.</p>
+            <Textarea
+              value={customImagePrompt}
+              onChange={(e) => setCustomImagePrompt(e.target.value)}
+              placeholder={`Generate an image for ${currentScene.name}`}
+              className="w-full p-3 bg-gray-700 text-white border-gray-600 rounded-lg"
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => handleGenerateSceneImage(customImagePrompt || undefined)}
+              disabled={isGeneratingImage}
+              className="bg-blue-600 hover:bg-blue-500"
+            >
+              {isGeneratingImage ? <Spinner size="sm" /> : "Generate Image"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

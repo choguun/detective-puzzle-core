@@ -2,13 +2,22 @@
 
 import { Clue, GameScene } from "./game-context";
 
-export type NarrativeRequest = {
-  type: "scene_description" | "clue_examination" | "story_progression" | "conclusion";
+export type NarrativeRequestType = 
+  | "scene_description" 
+  | "clue_examination" 
+  | "story_progression" 
+  | "conclusion"
+  | "scene_action";
+
+export interface NarrativeRequest {
+  type: NarrativeRequestType;
   scene?: GameScene;
   clue?: Clue;
   discoveredClues?: Clue[];
   playerContext?: string;
-};
+  customContext?: string;
+  action?: string;
+}
 
 export type NarrativeResponse = {
   content: string;
@@ -36,6 +45,9 @@ export async function generateNarrative(
         break;
       case "conclusion":
         prompt = buildConclusionPrompt(request.discoveredClues || [], request.playerContext || "");
+        break;
+      case "scene_action":
+        prompt = buildSceneActionPrompt(request.action || "");
         break;
       default:
         throw new Error("Invalid narrative request type");
@@ -140,5 +152,15 @@ function buildConclusionPrompt(discoveredClues: Clue[], playerContext: string): 
     Provide a dramatic conclusion to the mystery that ties together all the discovered clues. 
     Reveal the solution to the case in a satisfying way that explains the connections between the various pieces of evidence. 
     The conclusion should feel earned based on the clues that were discovered.
+  `;
+}
+
+function buildSceneActionPrompt(action: string): string {
+  return `
+    Describe the following scene action:
+    
+    Action: ${action}
+    
+    Provide a detailed description of the action and its impact on the story.
   `;
 } 
