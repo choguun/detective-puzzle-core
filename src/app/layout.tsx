@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
+import WagmiWrapper from "./WagmiWrapper";
 
 // Font definitions
 const inter = Inter({
@@ -46,11 +47,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} ${playfair.variable}`}>
-      <body className="min-h-screen bg-background antialiased font-sans">
-        <main className="relative flex min-h-screen flex-col">
-          {children}
-        </main>
-        <Toaster position="bottom-right" />
+      <body className="min-h-screen bg-background antialiased font-sans" suppressHydrationWarning>
+        <WagmiWrapper>
+          <main className="relative flex min-h-screen flex-col">
+            {children}
+          </main>
+          <Toaster position="bottom-right" />
+        </WagmiWrapper>
       </body>
     </html>
   );

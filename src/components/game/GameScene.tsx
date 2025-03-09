@@ -24,7 +24,6 @@ export default function GameScene() {
     generateImage,
     sceneImageUrl,
     currentNarrative,
-    regenerateNarrative,
     isGeneratingNarrative,
     totalSeconds,
     isTimerRunning,
@@ -59,7 +58,7 @@ export default function GameScene() {
   const [showImagePromptDialog, setShowImagePromptDialog] = useState<boolean>(false);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [revisedPrompt, setRevisedPrompt] = useState<string | null>(null);
-  const [showRevisedPrompt, setShowRevisedPrompt] = useState<boolean>(false);
+  const [showRevisedPrompt, ] = useState<boolean>(false);
 
   // Action state
   const [actionResponse, setActionResponse] = useState<string | null>(null);
@@ -345,16 +344,16 @@ export default function GameScene() {
   };
 
   // Toggle clues visibility for 5 seconds
-  const showCluesTemporarily = () => {
-    setShowCluesContainer(true);
-    showActionFeedback("Clues visible for 5 seconds!", "info");
+  // const showCluesTemporarily = () => {
+  //   setShowCluesContainer(true);
+  //   showActionFeedback("Clues visible for 5 seconds!", "info");
     
-    // Hide again after 5 seconds
-    setTimeout(() => {
-      setShowCluesContainer(false);
-      showActionFeedback("Clues hidden again.", "info");
-    }, 5000);
-  };
+  //   // Hide again after 5 seconds
+  //   setTimeout(() => {
+  //     setShowCluesContainer(false);
+  //     showActionFeedback("Clues hidden again.", "info");
+  //   }, 5000);
+  // };
 
   // Generate narrative/scene description
   const handleGenerateSceneImage = async (customPrompt?: string) => {
@@ -381,9 +380,9 @@ export default function GameScene() {
   };
 
   // Handle opening the prompt dialog
-  const handleOpenPromptDialog = () => {
-    setShowImagePromptDialog(true);
-  };
+  // const handleOpenPromptDialog = () => {
+  //   setShowImagePromptDialog(true);
+  // };
 
   // Handle clicking on a quick action prompt
   const handleQuickAction = (prompt: string) => {
@@ -397,19 +396,19 @@ export default function GameScene() {
   };
 
   // Toggle showing revised prompt
-  const toggleRevisedPrompt = () => {
-    setShowRevisedPrompt(prev => !prev);
-  };
+  // const toggleRevisedPrompt = () => {
+  //   setShowRevisedPrompt(prev => !prev);
+  // };
 
   // Regenerate the narrative description
-  const handleRegenerateNarrative = () => {
-    // Force regeneration when user explicitly requests it
-    console.log("User requested narrative refresh - forcing regeneration");
-    regenerateNarrative(true);
+  // const handleRegenerateNarrative = () => {
+  //   // Force regeneration when user explicitly requests it
+  //   console.log("User requested narrative refresh - forcing regeneration");
+  //   regenerateNarrative(true);
     
-    // Show feedback to the user
-    showActionFeedback("Refreshing scene description...", "info");
-  };
+  //   // Show feedback to the user
+  //   showActionFeedback("Refreshing scene description...", "info");
+  // };
 
   // Get scene-specific prompt examples
   const getSceneSpecificPrompts = (): string[] => {

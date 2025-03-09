@@ -9,6 +9,7 @@ import GameScene from "./GameScene";
 import DetectiveNotebook from "./DetectiveNotebook";
 import TutorialOverlay from "./TutorialOverlay";
 import HelpMenu from "./HelpMenu";
+import GameWalletAuth from "./GameWalletAuth";
 
 export default function GameLayout() {
   const { 
@@ -25,6 +26,7 @@ export default function GameLayout() {
   const [ambientSoundEnabled, setAmbientSoundEnabled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [isWalletAuthenticated, setIsWalletAuthenticated] = useState(false);
 
   // Set theme handling with next-themes
   useEffect(() => {
@@ -46,6 +48,10 @@ export default function GameLayout() {
   // Toggle notebook visibility
   const toggleNotebook = () => {
     setShowNotebook(!showNotebook);
+  };
+
+  const handleWalletAuthenticated = () => {
+    setIsWalletAuthenticated(true);
   };
   
   // Instructions dialog
@@ -94,7 +100,7 @@ export default function GameLayout() {
 
   if (!isGameStarted) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 relative overflow-hidden">
+      <div className="flex flex-col items-center justify-center min-h-[80vh] p-6 relative overflow-hidden h-screen">
         <div className="absolute inset-0 bg-cover bg-center opacity-20 z-0" 
           style={{backgroundImage: "url('/images/detective-background.jpg')"}}></div>
         <div className="absolute inset-0 bg-black/70 z-0"></div>
@@ -112,7 +118,18 @@ export default function GameLayout() {
             You are a detective called to investigate a mysterious case. 
             Explore the scene, discover clues, and solve the mystery.
           </p>
-          
+          {!isWalletAuthenticated ? (
+            <div className="bg-slate-900/80 p-8 rounded-lg border border-slate-700">
+            <h2 className="text-2xl font-semibold text-white mb-4">Authentication Required</h2>
+            <p className="text-slate-300 mb-6">
+              Connect your wallet and sign a message to prove your identity before starting the investigation.
+            </p>
+            <GameWalletAuth 
+              onAuthenticated={handleWalletAuthenticated} 
+              isGameStarted={false}
+            />
+          </div>
+        ) : (
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Button size="lg" onClick={handleStartGame} className="bg-primary hover:bg-primary/90">
               Begin Investigation
@@ -132,6 +149,7 @@ export default function GameLayout() {
               </DialogContent>
             </Dialog>
           </div>
+        )}
           
           <div className="pt-8 flex items-center justify-center gap-6">
             <Button 
@@ -172,7 +190,12 @@ export default function GameLayout() {
             Instructions
           </Button>
         </div>
-        
+        <div className="flex items-center gap-2">
+          <GameWalletAuth 
+            onAuthenticated={handleWalletAuthenticated}
+            isGameStarted={true}
+          />
+        </div>
         <div className="flex items-center gap-2">
           <HelpMenu onStartTutorial={handleShowTutorial} />
           
