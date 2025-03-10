@@ -1,21 +1,24 @@
-import React from "react";
+import React from 'react';
 
 interface SpinnerProps {
-  size?: "sm" | "md" | "lg";
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export default function Spinner({ size = "md", className = "" }: SpinnerProps) {
-  const sizeClasses = {
-    sm: "w-4 h-4 border-2",
-    md: "w-8 h-8 border-3",
-    lg: "w-12 h-12 border-4"
-  };
-
+const Spinner: React.FC<SpinnerProps> = ({ className = '', size = 'md' }) => {
+  const sizeClass = 
+    size === 'sm' ? 'h-4 w-4' : 
+    size === 'lg' ? 'h-8 w-8' : 
+    'h-6 w-6';
+  
   return (
     <div 
-      className={`animate-spin rounded-full border-t-transparent border-white ${sizeClasses[size]} ${className}`}
-      aria-label="Loading"
-    />
+      className={`inline-block animate-spin rounded-full border-2 border-solid border-current border-r-transparent ${sizeClass} ${className}`}
+      role="status"
+    >
+      <span className="sr-only">Loading...</span>
+    </div>
   );
-} 
+};
+
+export default Spinner; 

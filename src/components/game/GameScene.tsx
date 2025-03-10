@@ -12,8 +12,24 @@ import Spinner from "../ui/spinner";
 import GameTimer from "./GameTimer";
 import SceneSelector from "./SceneSelector";
 import MiniPuzzle from "./MiniPuzzle";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+// import { Card } from "@/components/ui/card";
+// import { Input } from "@/components/ui/input";
+import * as ethers from "ethers";
+import GameLogicABI from "@/contracts/GameLogic.json";
+import ClueNFTABI from "@/contracts/ClueNFT.json";
+import MysteryTokenABI from "@/contracts/MysteryToken.json";
+
+// Contract addresses - these would typically come from your environment variables
+const GAME_LOGIC_ADDRESS = process.env.NEXT_PUBLIC_GAME_LOGIC_ADDRESS || "";
+const CLUE_NFT_ADDRESS = process.env.NEXT_PUBLIC_CLUE_NFT_ADDRESS || "";
+const MYSTERY_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_MYSTERY_TOKEN_ADDRESS || "";
 
 export default function GameScene() {
+  const router = useRouter();
+  const { toast } = useToast();
+  
   // Game context
   const {
     currentScene,
@@ -71,6 +87,45 @@ export default function GameScene() {
   
   // Feedback state
   const [actionFeedback, setActionFeedback] = useState<{message: string, type: string} | null>(null);
+
+  // Web3 state
+  const [web3Provider, setWeb3Provider] = useState<any>(null);
+  const [web3Signer, setWeb3Signer] = useState<any>(null);
+  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [gameLogicContract, setGameLogicContract] = useState<ethers.Contract | null>(null);
+  const [clueNFTContract, setClueNFTContract] = useState<ethers.Contract | null>(null);
+  const [mysteryTokenContract, setMysteryTokenContract] = useState<ethers.Contract | null>(null);
+  const [isWalletConnecting, setIsWalletConnecting] = useState(false);
+  const [isBlockchainTxPending, setIsBlockchainTxPending] = useState(false);
+  
+  // Game data mapping - this would normally come from your backend or IPFS
+  const sceneData = {
+    study: {
+      name: "Detective's Study",
+      imageUrl: "/images/scenes/study.jpg",
+      clues: [
+        { id: "1", name: "Mysterious Letter", coordinates: { x: 25, y: 45 }, found: false },
+        { id: "2", name: "Broken Watch", coordinates: { x: 75, y: 60 }, found: false }
+      ],
+      nextScene: "library"
+    },
+    library: {
+      name: "Old Library",
+      imageUrl: "/images/scenes/library.jpg",
+      clues: [
+        { id: "3", name: "Bookmarked Page", coordinates: { x: 40, y: 30 }, found: false }
+      ],
+      nextScene: "basement"
+    },
+    basement: {
+      name: "Hidden Basement",
+      imageUrl: "/images/scenes/basement.jpg",
+      clues: [
+        { id: "4", name: "Hidden Key", coordinates: { x: 60, y: 70 }, found: false }
+      ],
+      nextScene: "end"
+    }
+  };
 
   // Define showActionFeedback first, before any useCallback that depends on it
   const showActionFeedback = useCallback((message: string, type: "success" | "error" | "info") => {
@@ -526,6 +581,209 @@ export default function GameScene() {
     );
   }
 
+  // Connect wallet function - this integrates with the existing game
+  const connectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      showActionFeedback("Please install MetaMask or another web3 wallet.", "error");
+      return;
+    }
+    
+    try {
+      setIsWalletConnecting(true);
+      
+      // Request account access
+      await window.ethereum.request({ method: "eth_requestAccounts" });
+      
+      // Create Web3 provider and signer
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const address = await signer.getAddress();
+      
+      // Initialize contracts
+      const gameLogic = new ethers.Contract(
+        GAME_LOGIC_ADDRESS, 
+        GameLogicABI.abi, 
+        signer
+      );
+      
+      const clueNFT = new ethers.Contract(
+        CLUE_NFT_ADDRESS, 
+        ClueNFTABI.abi, 
+        signer
+      );
+      
+      const mysteryToken = new ethers.Contract(
+        MYSTERY_TOKEN_ADDRESS, 
+        MysteryTokenABI.abi, 
+        signer
+      );
+      
+      // Set state
+      setWeb3Provider(provider);
+      setWeb3Signer(signer);
+      setWalletAddress(address);
+      setGameLogicContract(gameLogic);
+      setClueNFTContract(clueNFT);
+      setMysteryTokenContract(mysteryToken);
+      
+      // Check for existing blockchain data if we have a current scene
+      if (currentScene && gameLogic) {
+        try {
+          // Check if the player has already completed this scene
+          const hasCompleted = await gameLogic.hasCompletedScene(address, currentScene.id);
+          
+          if (hasCompleted) {
+            showActionFeedback("You've already completed this scene on-chain!", "info");
+          }
+          
+          // Check for any clues this player has already found
+          const sceneClues = discoveredClues.filter(clue => clue.sceneId === currentScene.id);
+          
+          for (const clue of sceneClues) {
+            const hasFoundClue = await gameLogic.hasFoundClue(address, clue.id);
+            if (hasFoundClue && !discoveredClueIds.includes(clue.id)) {
+              // The player has this clue on-chain but not in the current game state
+              discoverClue(clue.id);
+              showActionFeedback(`Synced clue "${clue.name}" from blockchain`, "success");
+            }
+          }
+        } catch (error) {
+          console.error("Error checking blockchain data:", error);
+        }
+      }
+      
+      showActionFeedback(`Connected as ${address.slice(0, 6)}...${address.slice(-4)}`, "success");
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      showActionFeedback("Failed to connect wallet. Please try again.", "error");
+    } finally {
+      setIsWalletConnecting(false);
+    }
+  };
+  
+  // For handleClueDiscovery
+  const originalHandleClueDiscovery = handleClueDiscovery;
+  
+  // Remove the redeclaration and make it an enhancement instead
+  useEffect(() => {
+    if (gameLogicContract && walletAddress) {
+      // Enhance the clue discovery with blockchain interaction
+      const enhanceClueDiscovery = async (clueId: string) => {
+        try {
+          setIsBlockchainTxPending(true);
+          
+          // Call the findClue function on the blockchain
+          const tx = await gameLogicContract.findClue(walletAddress, clueId);
+          await tx.wait();
+          
+          // Show success message
+          showActionFeedback("Clue NFT minted successfully!", "success");
+        } catch (error) {
+          console.error("Error minting clue NFT:", error);
+          showActionFeedback("Failed to mint clue NFT on blockchain. Game progress is still saved locally.", "error");
+        } finally {
+          setIsBlockchainTxPending(false);
+        }
+      };
+      
+      // Listen for clue discoveries to enhance them
+      const onClueDiscovered = (clueId: string) => {
+        enhanceClueDiscovery(clueId);
+      };
+      
+      // Set up event listener for clue discoveries
+      // This would need to be implemented in your game logic
+      
+      return () => {
+        // Clean up listeners
+      };
+    }
+  }, [gameLogicContract, walletAddress]);
+
+  // For checkSceneCompletion - use useEffect instead of redeclaring
+  useEffect(() => {
+    if (currentScene && completedScenes[currentScene.id] && walletAddress && gameLogicContract) {
+      // Offer to complete on blockchain
+      showActionFeedback("Complete this scene on blockchain to earn MYST tokens!", "info");
+    }
+  }, [currentScene, completedScenes, walletAddress, gameLogicContract]);
+
+  // Enhance puzzle completion instead of redeclaring
+  const enhancePuzzleCompletion = async () => {
+    if (!currentScene || !walletAddress || !gameLogicContract) return;
+    
+    try {
+      setIsBlockchainTxPending(true);
+      
+      // Get clues in this scene
+      const sceneClues = currentScene.clueIds || [];
+      
+      // Call the completeScene function on blockchain
+      const tx = await gameLogicContract.completeScene(
+        walletAddress,
+        currentScene.id,
+        totalSeconds || 0,
+        sceneClues.length
+      );
+      
+      await tx.wait();
+      
+      // Show success message with rewards if possible
+      if (mysteryTokenContract) {
+        const balance = await mysteryTokenContract.balanceOf(walletAddress);
+        const formattedBalance = ethers.utils.formatUnits(balance, 18);
+        
+        showActionFeedback(`Scene completed on blockchain! You now have ${parseFloat(formattedBalance).toFixed(2)} MYST tokens`, "success");
+      } else {
+        showActionFeedback("Scene completed on blockchain! Rewards have been sent to your wallet.", "success");
+      }
+    } catch (error) {
+      console.error("Error completing scene on blockchain:", error);
+      showActionFeedback("Failed to record completion on blockchain. Game progress is still saved locally.", "error");
+    } finally {
+      setIsBlockchainTxPending(false);
+    }
+  };
+
+  // Add a button to complete scene on blockchain when scene is completed
+  const BlockchainCompletionButton = () => {
+    if (!currentScene || !walletAddress || !gameLogicContract) return null;
+    if (!completedScenes[currentScene.id]) return null;
+    
+    return (
+      <Button 
+        className="mt-2 w-full"
+        onClick={enhancePuzzleCompletion}
+        disabled={isBlockchainTxPending}
+      >
+        {isBlockchainTxPending ? (
+          <>
+            <Spinner className="mr-2 h-4 w-4" />
+            Recording on Blockchain...
+          </>
+        ) : "Complete Scene on Blockchain"}
+      </Button>
+    );
+  };
+
+  // Calculate distance from mouse to hotspot
+  const getDistanceToClue = (clueX: number, clueY: number) => {
+    const dx = mousePosition?.x - clueX;
+    const dy = mousePosition?.y - clueY;
+    return dx && dy ? Math.sqrt(dx * dx + dy * dy) : Infinity;
+  };
+  
+  // Check if mouse is near a clue hotspot
+  const isNearClue = (clueId: string) => {
+    if (cluesFound.includes(clueId)) return false;
+    
+    const clue = sceneData[currentScene as keyof typeof sceneData].clues.find(c => c.id === clueId);
+    if (!clue) return false;
+    
+    const distance = getDistanceToClue(clue.coordinates.x, clue.coordinates.y);
+    return distance < 10; // Distance threshold for hotspot detection
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[calc(100vh-64px)] bg-gray-900 text-white">
       {/* Left Column - Scene Image & Clues */}
@@ -669,6 +927,38 @@ export default function GameScene() {
                 <p key={i} className={paragraph.includes("*You found") ? "text-green-400 font-semibold" : ""}>{paragraph}</p>
               ))}
             </div>
+          </div>
+        )}
+        
+        {/* Add wallet connection status/button in a fixed position */}
+        <div className="absolute top-4 right-4 z-50">
+          {!walletAddress ? (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              onClick={connectWallet}
+              disabled={isWalletConnecting}
+              className="bg-black/50 text-white border-white/30 hover:bg-black/70"
+            >
+              {isWalletConnecting ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  Connecting Wallet
+                </>
+              ) : "Connect Wallet"}
+            </Button>
+          ) : (
+            <div className="bg-black/50 text-white px-3 py-1 rounded-md text-xs border border-white/30">
+              {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+            </div>
+          )}
+        </div>
+        
+        {/* Show blockchain transaction indicator when minting NFTs or recording progress */}
+        {isBlockchainTxPending && (
+          <div className="absolute bottom-4 right-4 z-50 bg-orange-500/80 text-white px-3 py-1 rounded-md flex items-center text-sm">
+            <Spinner className="mr-2 h-4 w-4" />
+            Blockchain Transaction Pending...
           </div>
         )}
       </div>
@@ -820,6 +1110,38 @@ export default function GameScene() {
             </div>
           )}
         </div>
+        
+        {/* Add blockchain details section to the bottom of this column */}
+        {walletAddress && (
+          <div className="mt-auto pt-4 border-t border-gray-700">
+            <h3 className="text-sm font-semibold mb-2">Blockchain Status</h3>
+            <div className="text-xs space-y-1">
+              <div className="flex justify-between">
+                <span>Wallet Connected:</span>
+                <span className="text-green-400">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+              </div>
+              {mysteryTokenContract && (
+                <div className="flex justify-between">
+                  <span>MYST Balance:</span>
+                  <span className="text-yellow-400">
+                    {/* Add token balance display here */}
+                    {/* This would need to be added as state */}
+                  </span>
+                </div>
+              )}
+              {clueNFTContract && currentScene && (
+                <div className="flex justify-between">
+                  <span>Scene Clues:</span>
+                  <span>
+                    {discoveredClueIds.filter(id => 
+                      discoveredClues.find(c => c.id === id)?.sceneId === currentScene.id
+                    ).length} / {currentScene.clueIds?.length || 0}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Scene Completion Dialog */}

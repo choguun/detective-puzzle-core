@@ -10,6 +10,7 @@ import DetectiveNotebook from "./DetectiveNotebook";
 import TutorialOverlay from "./TutorialOverlay";
 import HelpMenu from "./HelpMenu";
 import GameWalletAuth from "./GameWalletAuth";
+import GameWeb3Connector from "./GameWeb3Connector";
 
 export default function GameLayout() {
   const { 
@@ -171,104 +172,108 @@ export default function GameLayout() {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4 space-y-6 relative min-h-screen">
-      {/* Atmospheric overlay for dark mode */}
-      {theme === 'dark' && (
-        <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-gray-900 to-black opacity-40 pointer-events-none z-0"></div>
-      )}
+    <div className="min-h-screen flex flex-col">
+      <GameWeb3Connector />
       
-      {/* Top Bar */}
-      <div className="flex items-center justify-between mb-6 z-10 relative">
-        <div className="flex items-center">
-          <h2 className="text-xl font-bold hidden sm:inline-block mr-4 font-serif">Mystery Room</h2>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => setShowInstructions(true)}
-            className="text-sm"
-          >
-            Instructions
-          </Button>
-        </div>
-        <div className="flex items-center gap-2">
-          <GameWalletAuth 
-            onAuthenticated={handleWalletAuthenticated}
-            isGameStarted={true}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <HelpMenu onStartTutorial={handleShowTutorial} />
-          
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-            className="text-sm hidden sm:flex"
-          >
-            {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAmbientSoundEnabled(!ambientSoundEnabled)}
-            className="text-sm hidden sm:flex"
-          >
-            {ambientSoundEnabled ? '🔊 Sound On' : '🔇 Sound Off'}
-          </Button>
-        </div>
-      </div>
-      
-      {/* Progress Bar */}
-      <div className="w-full bg-muted rounded-full h-2.5 relative z-10">
-        <div 
-          className="bg-primary h-2.5 rounded-full transition-all duration-500" 
-          style={{ width: `0%` }}
-        ></div>
-        <div className="absolute -top-7 right-0 text-xs">
-          Case Progress: Investigating...
-        </div>
-      </div>
-      
-      <div className="flex flex-col lg:flex-row gap-6 z-10 relative">
-        {/* Game Scene */}
-        <div className={`${showNotebook ? "lg:w-1/2" : "w-full"} transition-all duration-300`}>
-          <GameScene />
+      <div className="container mx-auto py-6 px-4 space-y-6 relative min-h-screen">
+        {/* Atmospheric overlay for dark mode */}
+        {theme === 'dark' && (
+          <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-900 via-gray-900 to-black opacity-40 pointer-events-none z-0"></div>
+        )}
+        
+        {/* Top Bar */}
+        <div className="flex items-center justify-between mb-6 z-10 relative">
+          <div className="flex items-center">
+            <h2 className="text-xl font-bold hidden sm:inline-block mr-4 font-serif">Mystery Room</h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowInstructions(true)}
+              className="text-sm"
+            >
+              Instructions
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <GameWalletAuth 
+              onAuthenticated={handleWalletAuthenticated}
+              isGameStarted={true}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <HelpMenu onStartTutorial={handleShowTutorial} />
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="text-sm hidden sm:flex"
+            >
+              {theme === 'dark' ? '🌞 Light' : '🌙 Dark'}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAmbientSoundEnabled(!ambientSoundEnabled)}
+              className="text-sm hidden sm:flex"
+            >
+              {ambientSoundEnabled ? '🔊 Sound On' : '🔇 Sound Off'}
+            </Button>
+          </div>
         </div>
         
-        {/* Detective's Notebook */}
-        {showNotebook && (
-          <div className="lg:w-1/2 h-[700px] overflow-auto">
-            <DetectiveNotebook />
+        {/* Progress Bar */}
+        <div className="w-full bg-muted rounded-full h-2.5 relative z-10">
+          <div 
+            className="bg-primary h-2.5 rounded-full transition-all duration-500" 
+            style={{ width: `0%` }}
+          ></div>
+          <div className="absolute -top-7 right-0 text-xs">
+            Case Progress: Investigating...
           </div>
+        </div>
+        
+        <div className="flex flex-col lg:flex-row gap-6 z-10 relative">
+          {/* Game Scene */}
+          <div className={`${showNotebook ? "lg:w-1/2" : "w-full"} transition-all duration-300`}>
+            <GameScene />
+          </div>
+          
+          {/* Detective's Notebook */}
+          {showNotebook && (
+            <div className="lg:w-1/2 h-[700px] overflow-auto">
+              <DetectiveNotebook />
+            </div>
+          )}
+        </div>
+        
+        {/* Bottom Actions */}
+        <div className="flex justify-between items-center z-10 relative">
+          <Button 
+            variant="outline" 
+            onClick={toggleNotebook}
+            className="flex-shrink-0"
+            id="notebook-toggle"
+          >
+            {showNotebook ? "Hide Notebook" : "View Notebook"}
+          </Button>
+          
+          <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Detective&apos;s Handbook</DialogTitle>
+              </DialogHeader>
+              {renderInstructions()}
+            </DialogContent>
+          </Dialog>
+        </div>
+        
+        {/* Tutorial Overlay */}
+        {showTutorial && (
+          <TutorialOverlay onComplete={handleTutorialComplete} />
         )}
       </div>
-      
-      {/* Bottom Actions */}
-      <div className="flex justify-between items-center z-10 relative">
-        <Button 
-          variant="outline" 
-          onClick={toggleNotebook}
-          className="flex-shrink-0"
-          id="notebook-toggle"
-        >
-          {showNotebook ? "Hide Notebook" : "View Notebook"}
-        </Button>
-        
-        <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Detective&apos;s Handbook</DialogTitle>
-            </DialogHeader>
-            {renderInstructions()}
-          </DialogContent>
-        </Dialog>
-      </div>
-      
-      {/* Tutorial Overlay */}
-      {showTutorial && (
-        <TutorialOverlay onComplete={handleTutorialComplete} />
-      )}
     </div>
   );
 } 
